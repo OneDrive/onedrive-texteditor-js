@@ -6,7 +6,7 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css">
-  <script type="text/javascript" src="https://js.live.net/v5.0/OneDrive.js" id="onedrive-js" client-id="0000000040152797"></script>
+  <script type="text/javascript" src="https://js.live.net/v5.0/OneDrive.debug.js" id="onedrive-js" client-id="0000000040152797"></script>
 </head>
 
 <body>
@@ -63,11 +63,13 @@ openButton.onclick = function() {
     multiSelect: false
   };
   OneDrive.open(options);
+  return false;
 };
 
 var saveButton = document.getElementById("saveButton");
 saveButton.onclick = function() {
 
+  return false;
 };
 
 
