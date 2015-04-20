@@ -56,7 +56,7 @@ openButton.onclick = function() {
   var options = {
     success: function(response) {
       var downloadLink = response.values[0].link;
-      loadFileInfoEditor(downloadLink);
+      loadFileIntoEditor(downloadLink);
     },
     cancel: function() { },
     linkType: "downloadLink",
@@ -68,6 +68,14 @@ openButton.onclick = function() {
 
 var saveButton = document.getElementById("saveButton");
 saveButton.onclick = function() {
+
+  var options = {
+    file: "notepad",
+    fileName: "new text file.txt",
+    success: function() {
+
+    }
+  };
 
   return false;
 };
