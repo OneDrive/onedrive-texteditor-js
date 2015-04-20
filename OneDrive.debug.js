@@ -392,7 +392,7 @@ OneDriveApp.prototype = {
                                 "@content.sourceUrl": file,
                                 "name": fileName,
                                 "file": {},
-                                "@name.conflictBehavior": "overwrite"
+                                "@name.conflictBehavior": "replace"
                             },
                             interface_method: method
                         };
