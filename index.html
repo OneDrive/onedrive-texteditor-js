@@ -37,6 +37,7 @@
 
 <div class="container" id="body">
   <textarea id="notepad"></textarea>
+  <input type="file" id="notepad2"></input>
 </div>
 
 
@@ -70,11 +71,18 @@ var saveButton = document.getElementById("saveButton");
 saveButton.onclick = function() {
 
   var options = {
-    file: "notepad",
+    file: "notepad2",
     fileName: "new text file.txt",
     success: function() {
-
+      window.alert("save successful!");
+    },
+    cancel: function() {
+      window.alert("cancelled");
+    },
+    error: function(e) {
+      window.alert("An error occured: " + e);
     }
+
   };
 
   OneDrive.save(options);
