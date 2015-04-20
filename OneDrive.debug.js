@@ -391,7 +391,8 @@ OneDriveApp.prototype = {
                             json_body: {
                                 "@content.sourceUrl": file,
                                 "name": fileName,
-                                "file": {}
+                                "file": {},
+                                "@name.conflictBehavior": "overwrite"
                             },
                             interface_method: method
                         };
