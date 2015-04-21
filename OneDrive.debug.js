@@ -5062,7 +5062,7 @@ AuthSession.prototype = {
     pad: function(input, width, c) {
       c = c || "0";
       input = input + '';
-      return input.length >= width ? input : new Array(width - input.length + 1).join(z) + input;
+      return input.length >= width ? input : new Array(width - input.length + 1).join(c) + input;
     },
 
     getStatus: function () {
