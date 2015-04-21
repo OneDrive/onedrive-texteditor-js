@@ -5103,6 +5103,10 @@ AuthSession.prototype = {
 
                         itemId = rawResult[1];
                         ownerCid = itemId.split("!")[0];
+                        if (ownerCid.length < 16) {
+                          ownerCid = "0" + ownerCid;
+                          itemId = "0" + itemId;
+                        }
                         resourceId = [selectionString, ownerCid, itemId].join(".");
                         authKey = result[2];
                     }
