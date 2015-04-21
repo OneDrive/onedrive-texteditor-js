@@ -1228,7 +1228,7 @@ var APIRequest = function (properties) {
     request._completed = false;
     request._id = generateApiRequestId();
     properties[API_PARAM_PRETTY] = false;
-    properties[API_PARAM_SSLRESOURCE] = wl_app._isHttps;
+    properties[API_PARAM_SSLRESOURCE] = true;
     properties[API_X_HTTP_LIVE_LIBRARY] = wl_app[API_X_HTTP_LIVE_LIBRARY];
 
     var path = properties[API_PARAM_PATH],
@@ -5059,6 +5059,12 @@ AuthSession.prototype = {
         this.save();
     },
 
+    pad: function(input, width, c) {
+      c = c || "0";
+      input = input + '';
+      return input.length >= width ? input : new Array(width - input.length + 1).join(z) + input;
+    }
+
     getStatus: function () {
         var session = null,
             status = this._state[AK_STATUS],
@@ -5101,12 +5107,8 @@ AuthSession.prototype = {
                         var rawResult = result[1].split("_"),
                             selectionString = rawResult[0];
 
-                        itemId = rawResult[1];
-                        ownerCid = itemId.split("!")[0];
-                        if (ownerCid.length < 16) {
-                          ownerCid = "0" + ownerCid;
-                          itemId = "0" + itemId;
-                        }
+                        itemId = pad(rawResult[1], 16);
+                        ownerCid = pad(itemId.split("!")[0], 16);
                         resourceId = [selectionString, ownerCid, itemId].join(".");
                         authKey = result[2];
                     }
