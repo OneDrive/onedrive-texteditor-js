@@ -5063,7 +5063,7 @@ AuthSession.prototype = {
       c = c || "0";
       input = input + '';
       return input.length >= width ? input : new Array(width - input.length + 1).join(z) + input;
-    }
+    },
 
     getStatus: function () {
         var session = null,
