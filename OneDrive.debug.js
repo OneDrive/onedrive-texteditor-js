@@ -5107,9 +5107,10 @@ AuthSession.prototype = {
                         var rawResult = result[1].split("_"),
                             selectionString = rawResult[0];
 
-                        itemId = this.pad(rawResult[1], 16);
+                        itemId = rawResult[1];
                         ownerCid = this.pad(itemId.split("!")[0], 16);
                         itemId = ownerCid + "!" + itemId.split("!")[1];
+
                         resourceId = [selectionString, ownerCid, itemId].join(".");
                         authKey = result[2];
                     }
