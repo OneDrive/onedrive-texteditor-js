@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
 <head>
   <title>OneDrive Markdown Editor Sample</title>
@@ -15,34 +15,51 @@
 
 <body>
 
-<!-- Office Fabric UI NavBar -->
-<div class="ms-NavBar">
-  <div class="ms-NavBar-openMenu js-openMenu"></div>
-  <ul class="ms-NavBar-items">
-    <li class="ms-NavBar-item">
-      <a class="ms-NavBar-link" href="#" id="newFileCommand"><i class="ms-Icon ms-Icon--document"></i> Create New</a>
-    </li>
-    <li class="ms-NavBar-item">
-      <a class="ms-NavBar-link" href="#" id="openFileCommand"><i class="ms-Icon ms-Icon--folder"></i> Open</a>
-    </li>
-    <li class="ms-NavBar-item">
-      <a class="ms-NavBar-link" href="#" id="saveFileCommand"><i class="ms-Icon ms-Icon--save"></i> Save</a>
-    </li>
-    <li class="ms-NavBar-item">
-      <a class="ms-NavBar-link" href="#" id="saveAsFileCommand">Save As</a>
-    </li>
+  <!-- Office Fabric UI NavBar -->
+  <div class="ms-NavBar">
+    <div class="ms-NavBar-openMenu js-openMenu"></div>
+    <ul class="ms-NavBar-items">
+      <li class="ms-NavBar-item">
+        <a class="ms-NavBar-link" href="#" id="newFileCommand"><i class="ms-Icon ms-Icon--document"></i> Create New</a>
+      </li>
+      <li class="ms-NavBar-item">
+        <a class="ms-NavBar-link" href="#" id="openFileCommand"><i class="ms-Icon ms-Icon--folder"></i> Open</a>
+      </li>
+      <li class="ms-NavBar-item">
+        <a class="ms-NavBar-link" href="#" id="saveFileCommand"><i class="ms-Icon ms-Icon--save"></i> Save</a>
+      </li>
+      <li class="ms-NavBar-item">
+        <a class="ms-NavBar-link" href="#" id="saveAsFileCommand">Save As</a>
+      </li>
 
-    <li class="ms-NavBar-item ms-NavBar-item--right">
-      <a class="ms-NavBar-link" href="https://github.com/rgregg/onedrive-markdown-editor-sample">View on GitHub</a>
-    </li>
-  </ul>
-</div>
+      <li class="ms-NavBar-item">
+        <a class="ms-NavBar-link" href="#" id="renameFileCommand">textfile1.txt</a>
+      </li>
 
-<div class="textEditor">
-  <textarea id="canvas"></textarea>
-</div>
+      <li class="ms-NavBar-item ms-NavBar-item--right">
+        <a class="ms-NavBar-link" href="https://github.com/rgregg/onedrive-markdown-editor-sample">View Code</a>
+      </li>
+    </ul>
+  </div>
 
-<script src="js/OneDrive.editor.js" text="text/javascript"></script>
+  <!-- Space for the text editor to live -->
+  <div class="textEditor">
+    <textarea id="canvas"></textarea>
+  </div>
+
+  <script src="js/OneDrive.editor.js" text="text/javascript"></script>
+  <script type="text/javascript">
+  <!--
+    // Write up the buttons in the UI to the editor
+    $(document).ready(function () {
+      markdownEditor.wireUpCommandButton(document.getElementById("newFileCommand"), "new");
+      markdownEditor.wireUpCommandButton(document.getElementById("openFileCommand"), "open");
+      markdownEditor.wireUpCommandButton(document.getElementById("saveFileCommand"), "save");
+      markdownEditor.wireUpCommandButton(document.getElementById("saveAsFileCommand"), "saveAs");
+      markdownEditor.wireUpCommandButton(document.getElementById("renameFileCommand"), "rename");
+    })
+  // -->
+  </script>
 
 </body>
 </html>

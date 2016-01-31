@@ -699,7 +699,9 @@ var Picker = function () {
             VroomWrapper.callVroomOpen(pickerResponse, options.getWebLinks, function (apiResponse) {
                 _this._handleSuccessResponse({
                     webUrl: apiResponse.webUrl,
-                    files: options.getWebLinks ? apiResponse.children && apiResponse.children.length > 0 ? apiResponse.children : [apiResponse] : apiResponse.value
+                    files: options.getWebLinks ? apiResponse.children && apiResponse.children.length > 0 ? apiResponse.children : [apiResponse] : apiResponse.value,
+                    baseUrl: Constants.VROOM_URL,
+                    accessToken: pickerResponse.accessToken
                 }, true);
             }, function () {
                 options.error(Constants.ERROR_WEB_REQUEST);
@@ -711,7 +713,9 @@ var Picker = function () {
             FilesV2Wrapper.callFilesV2Open(pickerResponse, options.getWebLinks, function (apiResponse) {
                 _this._handleSuccessResponse({
                     webUrl: null,
-                    files: apiResponse
+                    files: apiResponse,
+                    baseUrl: pickerResponse.apiEndpoint,
+                    accessToken: pickerResponse.accessToken
                 });
             }, function (errorCount) {
                 options.error({
@@ -724,7 +728,9 @@ var Picker = function () {
             var options = this._pickerOptions;
             var files = {
                     link: options.getWebLinks ? response.webUrl : null,
-                    value: response.files
+                    value: response.files,
+                    baseUrl: response.baseUrl,
+                    accessToken: response.accessToken
                 };
             var pickerFiles = response.files;
             if (!pickerFiles || !pickerFiles.length) {
