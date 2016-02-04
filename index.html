@@ -19,22 +19,27 @@
   <div class="ms-NavBar">
     <div class="ms-NavBar-openMenu js-openMenu"></div>
     <ul class="ms-NavBar-items">
-      <li class="ms-NavBar-item">
-        <a class="ms-NavBar-link" href="#" id="newFileCommand"><i class="ms-Icon ms-Icon--document"></i> Create New</a>
-      </li>
-      <li class="ms-NavBar-item">
-        <a class="ms-NavBar-link" href="#" id="openFileCommand"><i class="ms-Icon ms-Icon--folder"></i> Open</a>
-      </li>
-      <li class="ms-NavBar-item">
-        <a class="ms-NavBar-link" href="#" id="saveFileCommand"><i class="ms-Icon ms-Icon--save"></i> Save</a>
-      </li>
-      <li class="ms-NavBar-item">
-        <a class="ms-NavBar-link" href="#" id="saveAsFileCommand">Save As</a>
-      </li>
+        <li class="ms-NavBar-item">
+            <!-- Create new button -->
+            <a class="ms-NavBar-link" href="#" id="newFileCommand"><i class="ms-Icon ms-Icon--document"></i> Create New</a>
+        </li>
+        <li class="ms-NavBar-item">
+            <!-- Open Button to invoke the open picker -->
+            <a class="ms-NavBar-link" href="#" id="openFileCommand"><i class="ms-Icon ms-Icon--folder"></i> Open</a>
+        </li>
+        <li class="ms-NavBar-item">
+            <!-- Save button to save back without invoking the picker -->
+            <a class="ms-NavBar-link" href="#" id="saveFileCommand"><i class="ms-Icon ms-Icon--save"></i> Save</a>
+        </li>
+        <li class="ms-NavBar-item">
+            <!-- Save As button to invoke the picker in save mode -->
+            <a class="ms-NavBar-link" href="#" id="saveAsFileCommand">Save As</a>
+        </li>
 
-      <li class="ms-NavBar-item">
-        <a class="ms-NavBar-link" href="#" id="renameFileCommand">textfile1.txt</a>
-      </li>
+        <li class="ms-NavBar-item">
+            <!-- Current item filename, which you can click to change -->
+            <a class="ms-NavBar-link" href="#" id="renameFileCommand">textfile1.md</a>
+        </li>
 
       <li class="ms-NavBar-item ms-NavBar-item--right">
         <a class="ms-NavBar-link" href="https://github.com/rgregg/onedrive-markdown-editor-sample">View Code</a>
@@ -42,15 +47,16 @@
     </ul>
   </div>
 
-  <!-- Space for the text editor to live -->
-  <div class="textEditor">
+
+<div class="textEditor">
+    <!-- Space for the text editor to live -->
     <textarea id="canvas"></textarea>
-  </div>
+</div>
 
   <script src="js/OneDrive.editor.js" text="text/javascript"></script>
   <script type="text/javascript">
   <!--
-    // Write up the buttons in the UI to the editor
+    // Write up the buttons in the UI to the editor instance
     $(document).ready(function () {
       markdownEditor.wireUpCommandButton(document.getElementById("newFileCommand"), "new");
       markdownEditor.wireUpCommandButton(document.getElementById("openFileCommand"), "open");
