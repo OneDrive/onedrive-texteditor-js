@@ -10,6 +10,8 @@
   <link rel="stylesheet" href="https://appsforoffice.microsoft.com/fabric/1.0/fabric.components.min.css">
   <link rel="stylesheet" href="css/custom.style.css">
   <script text="text/javascript" src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-2.1.4.min.js"></script>
+  
+  <!-- Include the OneDrive SDK from CDN or locally, reference client IDs -->
   <script type="text/javascript" src="js/OneDrive.debug.js" id="onedrive-js" client-id="000000004018292B,a27ac898-2869-4633-88d2-bcb9491f9ce8"></script>
 </head>
 
@@ -56,7 +58,6 @@
   <script src="js/OneDrive.editor.js" text="text/javascript"></script>
   <script type="text/javascript">
   <!--
-    // Write up the buttons in the UI to the editor instance
     $(document).ready(function () {
       markdownEditor.wireUpCommandButton(document.getElementById("newFileCommand"), "new");
       markdownEditor.wireUpCommandButton(document.getElementById("openFileCommand"), "open");

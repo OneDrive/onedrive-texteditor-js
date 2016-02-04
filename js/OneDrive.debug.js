@@ -714,7 +714,7 @@ var Picker = function () {
                 _this._handleSuccessResponse({
                     webUrl: null,
                     files: apiResponse,
-                    baseUrl: pickerResponse.apiEndpoint,
+                    baseUrl: pickerResponse.apiEndpointUrl,
                     accessToken: pickerResponse.accessToken
                 });
             }, function (errorCount) {
