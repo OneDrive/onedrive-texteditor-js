@@ -6,6 +6,8 @@ var Constants = function () {
         function Constants() {
         }
         Constants.ERROR_ACCESS_DENIED = 'access_denied';
+        Constants.ERROR_AUTH_REQUIRED = 'user_authentication_required';
+        Constants.ERROR_LOGIN_REQUIRED = 'login_required';
         Constants.ERROR_POPUP_OPEN = {
             errorCode: ErrorType.popupOpen,
             message: 'popup window is already open'
@@ -43,6 +45,11 @@ var Constants = function () {
         Constants.CUSTOMER_TID = '9188040d-6c67-4c5b-b112-36a304b66dad';
         Constants.DEFAULT_QUERY_ITEM_PARAMETER = 'expand=thumbnails&select=id,name,size,webUrl,folder';
         Constants.GLOBAL_FUNCTION_PREFIX = 'oneDriveFilePicker';
+        Constants.LOGIN_HINT_KEY = 'odsdkLoginHint';
+        Constants.LOGIN_HINT_LIFE_SPAN = 86400000;
+        Constants.DOMAIN_HINT_COMMON = 'common';
+        Constants.DOMAIN_HINT_AAD = 'organizations';
+        Constants.DOMAIN_HINT_MSA = 'consumers';
         return Constants;
     }();
 module.exports = Constants;
@@ -131,6 +138,7 @@ var OneDriveApp = function () {
     }();
 module.exports = OneDriveApp;
 },{"./OneDriveState":4,"./models/PickerMode":9,"./utilities/DomUtilities":15,"./utilities/ErrorHandler":16,"./utilities/Logging":18,"./utilities/Picker":20,"./utilities/RedirectUtilities":22,"./utilities/ResponseParser":23,"./utilities/Saver":24}],4:[function(_dereq_,module,exports){
+var Constants = _dereq_('./Constants'), Logging = _dereq_('./utilities/Logging');
 var OneDriveState = function () {
         function OneDriveState() {
         }
@@ -148,12 +156,45 @@ var OneDriveState = function () {
         OneDriveState.getODCHost = function () {
             return (OneDriveState.debug ? 'live-int' : 'live') + '.com';
         };
+        OneDriveState.getLoginHint = function (clientId) {
+            if (localStorage) {
+                var storedLogins = JSON.parse(localStorage.getItem(Constants.LOGIN_HINT_KEY));
+                if (storedLogins != null && storedLogins[clientId]) {
+                    OneDriveState.loginHint = storedLogins[clientId];
+                }
+            } else {
+                Logging.logError('the browser does not support local storage');
+            }
+        };
+        OneDriveState.updateLoginHint = function (clientId) {
+            if (localStorage) {
+                var storedLogins = JSON.parse(localStorage.getItem(Constants.LOGIN_HINT_KEY));
+                if (storedLogins == null) {
+                    storedLogins = {};
+                }
+                storedLogins[clientId] = OneDriveState.loginHint;
+                localStorage.setItem(Constants.LOGIN_HINT_KEY, JSON.stringify(storedLogins));
+            } else {
+                Logging.logError('the browser does not support local storage');
+            }
+        };
+        OneDriveState.deleteLoghinHint = function (clientId) {
+            if (localStorage) {
+                var storedLogins = JSON.parse(localStorage.getItem(Constants.LOGIN_HINT_KEY));
+                if (storedLogins != null && storedLogins[clientId]) {
+                    delete storedLogins[clientId];
+                    localStorage.setItem(Constants.LOGIN_HINT_KEY, JSON.stringify(storedLogins));
+                }
+            } else {
+                Logging.logError('the browser does not support local storage');
+            }
+        };
         OneDriveState.debug = false;
         OneDriveState._isSdkReady = true;
         return OneDriveState;
     }();
 module.exports = OneDriveState;
-},{}],5:[function(_dereq_,module,exports){
+},{"./Constants":1,"./utilities/Logging":18}],5:[function(_dereq_,module,exports){
 var ApiEndpoint;
 (function (ApiEndpoint) {
     ApiEndpoint[ApiEndpoint['filesV2'] = 0] = 'filesV2';
@@ -499,7 +540,7 @@ var GraphWrapper = function () {
             var runBatch = function (batchStart, batchEnd) {
                 for (var i = batchStart; i < batchEnd; i++) {
                     var handleShareSuccess = function (sharedItem, permissionFacet) {
-                        sharedItem.permissions = permissionFacet;
+                        sharedItem.permissions = [permissionFacet];
                         sharedItems.push(sharedItem);
                         invokeCallbacks();
                     };
@@ -703,11 +744,6 @@ var ObjectUtilities = function () {
 module.exports = ObjectUtilities;
 },{"../Constants":1,"./Logging":18}],20:[function(_dereq_,module,exports){
 var Constants = _dereq_('../Constants'), ErrorHandler = _dereq_('./ErrorHandler'), ErrorType = _dereq_('../models/ErrorType'), Logging = _dereq_('./Logging'), ObjectUtilities = _dereq_('./ObjectUtilities'), Popup = _dereq_('./Popup'), PickerOptions = _dereq_('../models/PickerOptions'), RedirectUtilities = _dereq_('./RedirectUtilities'), StringUtilities = _dereq_('./StringUtilities'), UrlUtilities = _dereq_('./UrlUtilities'), GraphWrapper = _dereq_('./GraphWrapper'), PickerActionType = _dereq_('../models/PickerActionType');
-var VROOM_THUMBNAIL_SIZES = [
-        'large',
-        'medium',
-        'small'
-    ];
 var Picker = function () {
         function Picker(options) {
             var clonedOptions = ObjectUtilities.shallowClone(options);
@@ -782,7 +818,8 @@ var Picker = function () {
                     GraphWrapper.callGraphShareBatch(pickerResponse, getReponse.children, createLinkParameters, function (sharedItems, sharingFailedItems) {
                         _this._handleSuccessResponse({
                             webUrl: getReponse.webUrl,
-                            files: sharedItems
+                            files: sharedItems,
+                            accessToken: pickerResponse.accessToken
                         });
                     });
                 };
@@ -790,7 +827,8 @@ var Picker = function () {
                 handleGetSuccess = function (getReponse) {
                     _this._handleSuccessResponse({
                         webUrl: getReponse.webUrl,
-                        files: getReponse.children
+                        files: getReponse.children,
+                        accessToken: pickerResponse.accessToken
                     }, true);
                 };
             }
@@ -812,7 +850,8 @@ var Picker = function () {
                     GraphWrapper.callGraphShareBatch(pickerResponse, getReponse, createLinkParameters, function (sharedItems, sharingFailedItems) {
                         _this._handleSuccessResponse({
                             webUrl: null,
-                            files: sharedItems
+                            files: sharedItems,
+                            accessToken: pickerResponse.accessToken
                         });
                     });
                 };
@@ -820,7 +859,8 @@ var Picker = function () {
                 handleGetSuccess = function (getReponse) {
                     _this._handleSuccessResponse({
                         webUrl: null,
-                        files: getReponse
+                        files: getReponse,
+                        accessToken: pickerResponse.accessToken
                     }, true);
                 };
             }
@@ -831,8 +871,9 @@ var Picker = function () {
         Picker.prototype._handleSuccessResponse = function (response, isMSA) {
             var options = this._pickerOptions;
             var files = {
-                    link: options.getWebLinks ? response.webUrl : null,
-                    values: []
+                    webUrl: options.getWebLinks ? response.webUrl : null,
+                    value: [],
+                    accessToken: response.accessToken
                 };
             var pickerFiles = response.files;
             if (!pickerFiles || !pickerFiles.length) {
@@ -844,17 +885,7 @@ var Picker = function () {
             Logging.logMessage(StringUtilities.format('returning \'{0}\' files picked', pickerFiles.length));
             for (var i = 0; i < pickerFiles.length; i++) {
                 var pickerFile = pickerFiles[i];
-                if (isMSA) {
-                    var thumbnails = [];
-                    var fileThumbnails = pickerFile.thumbnails && pickerFile.thumbnails[0];
-                    if (fileThumbnails) {
-                        for (var j = 0; j < VROOM_THUMBNAIL_SIZES.length; j++) {
-                            thumbnails.push(fileThumbnails[VROOM_THUMBNAIL_SIZES[j]].url);
-                        }
-                        pickerFile.thumbnails = thumbnails;
-                    }
-                }
-                files.values.push(pickerFile);
+                files.value.push(pickerFile);
             }
             options.success(files);
         };
@@ -940,7 +971,7 @@ var Popup = function () {
 module.exports = Popup;
 },{"../Constants":1,"./CallbackInvoker":14,"./Logging":18,"./ResponseParser":23}],22:[function(_dereq_,module,exports){
 var Constants = _dereq_('../Constants'), DomUtilities = _dereq_('./DomUtilities'), ErrorHandler = _dereq_('./ErrorHandler'), Logging = _dereq_('./Logging'), ObjectUtilities = _dereq_('./ObjectUtilities'), OneDriveState = _dereq_('../OneDriveState'), PickerMode = _dereq_('../models/PickerMode'), StringUtilities = _dereq_('./StringUtilities'), TypeValidators = _dereq_('./TypeValidators'), UrlUtilities = _dereq_('./UrlUtilities'), WindowState = _dereq_('./WindowState'), XHR = _dereq_('./XHR');
-var AAD_LOGIN_URL = 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize';
+var AAD_LOGIN_URL = 'https://login.microsoftonline.com/{0}/oauth2/v2.0/authorize';
 var RedirectUtilities = function () {
         function RedirectUtilities() {
         }
@@ -954,17 +985,11 @@ var RedirectUtilities = function () {
             if (values) {
                 WindowState.setWindowState(values, windowState);
             }
-            window.location.replace(url);
+            window.location.href = url;
         };
         RedirectUtilities.handleRedirect = function () {
             var queryParameters = UrlUtilities.readCurrentUrlParameters();
             var serializedState = WindowState.getWindowState();
-            var state = queryParameters[Constants.PARAM_STATE] || serializedState[Constants.PARAM_STATE];
-            if (!state && queryParameters[Constants.PARAM_ERROR] === Constants.ERROR_ACCESS_DENIED) {
-                queryParameters[Constants.PARAM_STATE] = Constants.STATE_MSA_PICKER;
-            } else if (state === Constants.STATE_AAD_PICKER) {
-                queryParameters[Constants.PARAM_STATE] = Constants.STATE_AAD_PICKER;
-            }
             var redirectState = queryParameters[Constants.PARAM_STATE];
             if (!redirectState) {
                 return null;
@@ -979,6 +1004,13 @@ var RedirectUtilities = function () {
             if (!options) {
                 ErrorHandler.throwError('missing options from serialized state');
             }
+            if (queryParameters[Constants.PARAM_ERROR] === Constants.ERROR_LOGIN_REQUIRED || queryParameters[Constants.PARAM_ERROR] === Constants.ERROR_AUTH_REQUIRED) {
+                OneDriveState.deleteLoghinHint(options.clientId);
+                OneDriveState.loginHint = null;
+                RedirectUtilities.redirectToAADLogin(options, serializedState, true);
+                return null;
+            }
+            OneDriveState.getLoginHint(options.clientId);
             var inPopupFlow = TypeValidators.validateType(options.openInNewWindow, Constants.TYPE_BOOLEAN);
             if (inPopupFlow) {
                 RedirectUtilities._displayOverlay();
@@ -1012,21 +1044,35 @@ var RedirectUtilities = function () {
             }
             return null;
         };
-        RedirectUtilities.redirectToAADLogin = function (options, stateValues) {
+        RedirectUtilities.redirectToAADLogin = function (options, stateValues, forceLogin) {
             if (!options.openInNewWindow) {
                 RedirectUtilities._displayOverlay();
             }
-            if (!options.clientId) {
-                ErrorHandler.throwError('clientId is missing in options');
+            if (options.advanced && options.advanced.loginHint) {
+                OneDriveState.loginHint = {
+                    domainHint: Constants.DOMAIN_HINT_AAD,
+                    loginHint: options.advanced.loginHint,
+                    timeStamp: new Date().getTime()
+                };
             }
-            var url = UrlUtilities.appendQueryStrings(AAD_LOGIN_URL, {
-                    'redirect_uri': options.advanced.redirectUri,
-                    'client_id': options.clientId,
-                    'scope': 'openid https://graph.microsoft.com/Files.ReadWrite https://graph.microsoft.com/User.Read',
-                    'response_mode': 'fragment',
-                    'state': Constants.STATE_AAD_LOGIN,
-                    'nonce': UrlUtilities.generateNonce()
+            var url;
+            if (!forceLogin && OneDriveState.loginHint && new Date().getTime() - Constants.LOGIN_HINT_LIFE_SPAN < OneDriveState.loginHint.timeStamp) {
+                url = UrlUtilities.appendQueryStrings(StringUtilities.format(AAD_LOGIN_URL, OneDriveState.loginHint.domainHint), {
+                    'prompt': 'none',
+                    'domain_hint': OneDriveState.loginHint.domainHint,
+                    'login_hint': OneDriveState.loginHint.loginHint
                 });
+            } else {
+                url = StringUtilities.format(AAD_LOGIN_URL, Constants.DOMAIN_HINT_COMMON);
+            }
+            url = UrlUtilities.appendQueryStrings(url, {
+                'redirect_uri': options.advanced.redirectUri,
+                'client_id': options.clientId,
+                'scope': 'profile openid https://graph.microsoft.com/Files.ReadWrite https://graph.microsoft.com/User.Read',
+                'response_mode': 'fragment',
+                'state': Constants.STATE_AAD_LOGIN,
+                'nonce': UrlUtilities.generateNonce()
+            });
             url += '&response_type=id_token+token';
             RedirectUtilities.redirect(url, stateValues);
         };
@@ -1041,8 +1087,24 @@ var RedirectUtilities = function () {
             options.advanced.accessToken = queryParameters[Constants.PARAM_ACCESS_TOKEN];
             var open_id = JSON.parse(atob(id_token.split('.')[1]));
             if (open_id.tid === Constants.CUSTOMER_TID) {
+                if (open_id.preferred_username) {
+                    OneDriveState.loginHint = {
+                        loginHint: open_id.preferred_username,
+                        domainHint: Constants.DOMAIN_HINT_MSA,
+                        timeStamp: new Date().getTime()
+                    };
+                    OneDriveState.updateLoginHint(options.clientId);
+                }
                 RedirectUtilities._redirectToODCPicker(options, optionsMode);
             } else {
+                if (open_id.preferred_username) {
+                    OneDriveState.loginHint = {
+                        loginHint: open_id.preferred_username,
+                        domainHint: Constants.DOMAIN_HINT_AAD,
+                        timeStamp: new Date().getTime()
+                    };
+                    OneDriveState.updateLoginHint(options.clientId);
+                }
                 RedirectUtilities._redirectToTenant(options, optionsMode, options.openInNewWindow);
             }
         };
@@ -1281,7 +1343,7 @@ var ResponseParser = function () {
     }();
 module.exports = ResponseParser;
 },{"../Constants":1,"../models/ApiEndpoint":5,"./ErrorHandler":16,"./Logging":18}],24:[function(_dereq_,module,exports){
-var CallbackInvoker = _dereq_('./CallbackInvoker'), Constants = _dereq_('../Constants'), ErrorHandler = _dereq_('./ErrorHandler'), ErrorType = _dereq_('../models/ErrorType'), GraphWrapper = _dereq_('./GraphWrapper'), Logging = _dereq_('./Logging'), ObjectUtilities = _dereq_('./ObjectUtilities'), OneDriveState = _dereq_('../OneDriveState'), Popup = _dereq_('./Popup'), RedirectUtilities = _dereq_('./RedirectUtilities'), SaverActionType = _dereq_('../models/SaverActionType'), SaverOptions = _dereq_('../models/SaverOptions'), StringUtilities = _dereq_('./StringUtilities'), UploadType = _dereq_('../models/UploadType'), UrlUtilities = _dereq_('./UrlUtilities'), XHR = _dereq_('./XHR');
+var ApiEndpoint = _dereq_('../models/ApiEndpoint'), CallbackInvoker = _dereq_('./CallbackInvoker'), Constants = _dereq_('../Constants'), ErrorHandler = _dereq_('./ErrorHandler'), ErrorType = _dereq_('../models/ErrorType'), GraphWrapper = _dereq_('./GraphWrapper'), Logging = _dereq_('./Logging'), ObjectUtilities = _dereq_('./ObjectUtilities'), OneDriveState = _dereq_('../OneDriveState'), Popup = _dereq_('./Popup'), RedirectUtilities = _dereq_('./RedirectUtilities'), SaverActionType = _dereq_('../models/SaverActionType'), SaverOptions = _dereq_('../models/SaverOptions'), StringUtilities = _dereq_('./StringUtilities'), UploadType = _dereq_('../models/UploadType'), UrlUtilities = _dereq_('./UrlUtilities'), XHR = _dereq_('./XHR');
 var POLLING_INTERVAL = 1000;
 var POLLING_COUNTER = 5;
 var Saver = function () {
@@ -1341,8 +1403,9 @@ var Saver = function () {
                     }
                     if (options.action === SaverActionType.query) {
                         options.success({
-                            link: null,
-                            values: [folder]
+                            webUrl: null,
+                            value: [folder],
+                            accessToken: saverResponse.accessToken
                         });
                     } else if (options.action === SaverActionType.save) {
                         _this._executeUpload(saverResponse, folder);
@@ -1366,8 +1429,9 @@ var Saver = function () {
                 if (options.action === SaverActionType.query) {
                     GraphWrapper.callGraphGetODB(saverResponse, queryParameters, function (apiResponse) {
                         options.success({
-                            link: null,
-                            values: [apiResponse]
+                            webUrl: null,
+                            value: [apiResponse],
+                            accessToken: saverResponse.accessToken
                         });
                     }, function () {
                         options.error(Constants.ERROR_WEB_REQUEST);
@@ -1425,6 +1489,7 @@ var Saver = function () {
                     'name': options.fileName,
                     'file': {}
                 };
+            body[this._getContentSourceUrl(saverResponse.apiEndpoint)] = options.sourceUri;
             var xhr = new XHR({
                     url: uploadUrl,
                     clientId: OneDriveState.clientId,
@@ -1487,8 +1552,9 @@ var Saver = function () {
                 var data = event.target.result;
                 xhr.upload(data, function (xhr, statusCode) {
                     options.success({
-                        link: null,
-                        values: [JSON.parse(xhr.responseText)]
+                        webUrl: null,
+                        value: [JSON.parse(xhr.responseText)],
+                        accessToken: saverResponse.accessToken
                     });
                 }, function (xhr, statusCode, timeout) {
                     options.error(Constants.ERROR_WEB_REQUEST);
@@ -1523,8 +1589,8 @@ var Saver = function () {
                     case 200:
                         options.progress(100);
                         options.success({
-                            link: null,
-                            values: []
+                            webUrl: null,
+                            value: []
                         });
                         break;
                     default:
@@ -1536,10 +1602,17 @@ var Saver = function () {
             };
             CallbackInvoker.invokeCallbackAsynchronous(pollForProgress, pollingInterval);
         };
+        Saver.prototype._getContentSourceUrl = function (apiEndpoint) {
+            if (apiEndpoint === ApiEndpoint.graph_odb || ApiEndpoint.graph_odc) {
+                return '@microsoft.graph.sourceUrl';
+            } else {
+                return '@content.sourceUrl';
+            }
+        };
         return Saver;
     }();
 module.exports = Saver;
-},{"../Constants":1,"../OneDriveState":4,"../models/ErrorType":6,"../models/SaverActionType":11,"../models/SaverOptions":12,"../models/UploadType":13,"./CallbackInvoker":14,"./ErrorHandler":16,"./GraphWrapper":17,"./Logging":18,"./ObjectUtilities":19,"./Popup":21,"./RedirectUtilities":22,"./StringUtilities":25,"./UrlUtilities":27,"./XHR":29}],25:[function(_dereq_,module,exports){
+},{"../Constants":1,"../OneDriveState":4,"../models/ApiEndpoint":5,"../models/ErrorType":6,"../models/SaverActionType":11,"../models/SaverOptions":12,"../models/UploadType":13,"./CallbackInvoker":14,"./ErrorHandler":16,"./GraphWrapper":17,"./Logging":18,"./ObjectUtilities":19,"./Popup":21,"./RedirectUtilities":22,"./StringUtilities":25,"./UrlUtilities":27,"./XHR":29}],25:[function(_dereq_,module,exports){
 var FORMAT_ARGS_REGEX = /[\{\}]/g;
 var FORMAT_REGEX = /\{\d+\}/g;
 var StringUtilities = function () {

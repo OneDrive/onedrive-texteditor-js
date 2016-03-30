@@ -15,7 +15,7 @@ var markdownEditor = {
             
             success: function (files) {
                 // Get the first selected file (since we're not doing multi-select)
-                var selectedFile = files.values[0];
+                var selectedFile = files.value[0];
 
                 // Take the API response (selectedFile) and do something with it, in this case download and open
                 // the contents of the file.
