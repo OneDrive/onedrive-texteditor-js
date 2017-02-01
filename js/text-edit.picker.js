@@ -9,7 +9,7 @@ var markdownEditor = {
         var options = {
 
             // Specify the options for the picker (we want download links and only one file).
-            clientId: "57a7b669-a02a-4456-8091-cb027d765c86",
+            clientId: "02590d81-45de-4e3d-a722-4f558244f068",
             action: "download",
             multiSelect: false,
             
