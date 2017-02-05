@@ -1,4 +1,6 @@
 var markdownEditor = {
+    applicationId: "02590d81-45de-4e3d-a722-4f558244f068",
+
     /************ Open *************/
 
     // Open a new file by invoking the picker to select a file from OneDrive.
@@ -7,11 +9,13 @@ var markdownEditor = {
 
         // Build the options that we pass to the picker
         var options = {
-
             // Specify the options for the picker (we want download links and only one file).
-            clientId: "02590d81-45de-4e3d-a722-4f558244f068",
+            clientId: parent.applicationId,
             action: "download",
             multiSelect: false,
+            advanced: {
+                filter: ".md,.mdown,.txt"
+            },
             
             success: function (files) {
                 // Get the first selected file (since we're not doing multi-select)
@@ -115,7 +119,7 @@ var markdownEditor = {
 
         // Build the picker options that include the filename data URI, and callback methods
         var options = {
-            clientId: "57a7b669-a02a-4456-8091-cb027d765c86",
+            clientId: parent.applicationId,
             action: "save",
             sourceUri: dataUri,
             fileName: filename,
