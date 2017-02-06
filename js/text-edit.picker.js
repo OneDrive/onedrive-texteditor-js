@@ -81,79 +81,13 @@ var markdownEditor = {
             return;
         }
 
+        // Since we're using the API to write back changes, make sure we have a valid
+        // access_token and then invoke saveFileWithToken.
         this.retrievePassiveAccessToken(this.user, this.saveFileWithToken, {parent: this});
     },
 
-    patchDriveItemWithToken: function(token, state) {
-        if (token == null) {
-            // An error occured and we don't have a token available to save.
-            window.alert("Unable to save file due to an authentication error. Try using Save As instead.");
-            return;
-        }
-        
-        if (state == null) {
-            window.alert("The state parameter is required for this method.");
-            return;
-        }
-
-        var item = state.driveItem;
-        var propList = state.propertyList;
-        var parent = state.parent;
-        
-        // For PATCH we don't invoke the picker, we're going to use the REST API directly
-        var url = parent.generateGraphUrl(item, false, false);
-
-        // Create a new XMLHttpRequest() and execute it.
-        var xhr = new XMLHttpRequest();
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState == 4) {
-                // Need to update parent.lastSelectedFile with the response from this 
-                // request so future saves go to the right place
-                var uploadedItem = JSON.parse(xhr.responseText);
-                if (uploadedItem && uploadedItem.name && uploadedItem.parentReference )
-                    parent.lastSelectedFile = uploadedItem;
-                if (state.alert) {
-                    window.alert(state.alert);
-                } else {
-                    window.alert("File saved successfully.");
-                }
-            }
-        }
-        xhr.onerror = function() {
-            window.alert("Error occured patching file metadata.");
-        }
-
-        xhr.open("PATCH", url, true);
-        xhr.setRequestHeader("Content-type", "application/json");
-        xhr.setRequestHeader("Authorization", "Bearer " + parent.accessToken.accessToken)
-
-        // Copy the values to patch into patchData
-        var patchData = { };
-        for(var i=0, len = propList.length; i < len; i++)
-        {
-            patchData[propList[i]] = item[propList[i]];
-        }
-        xhr.send(JSON.stringify(patchData));
-    },
-
-    // Used to generate the Microsoft Graph URL for a target item, with a few parameters
-    // uploadIntoParentFolder: bool, indicates that we should be targeting the parent folder + filename instead of the item itself
-    // targetContentStream: bool, indicates we should append /content to the item URL
-    generateGraphUrl: function(driveItem, uploadIntoParentFolder, targetContentStream) {
-        var url = "https://graph.microsoft.com/v1.0/";
-        if (uploadIntoParentFolder)
-        {
-            url += "drives/" + driveItem.parentReference.driveId + "/items/" +driveItem.parentReference.id + "/children/" + driveItem.name;
-        } else {
-            url += "drives/" + driveItem.parentReference.driveId + "/items/" + driveItem.id;
-        }
-
-        if (targetContentStream)
-            url += "/content";
-
-        return url;
-    },
-
+    // Save the contents of the editor back to a target drive item. Requires an access token
+    // and a parent reference in the state object.
     saveFileWithToken: function (token, state) {
         if (token == null) {
             // An error occured and we don't have a token available to save.
@@ -204,6 +138,8 @@ var markdownEditor = {
         xhr.send(bodyContentLineBreaks);
     },
 
+    /************ Save As *************/
+
     // Save the contents of the editor back to the server using a new filename. Invokes
     // the picker to allow the user to select a folder where the file should be saved.
     saveAsFile: function () {
@@ -215,10 +151,7 @@ var markdownEditor = {
         if (!filename || filename == "")
             filename = this.defaultFileName;
 
-        // Encode the contents of the file into a data URI so we can upload it using the picker.
-        var dataUri = this.encodeTextAsDataUrl($("#canvas").val());
-
-        // Build the picker options that include the filename data URI, and callback methods
+        // Build the picker options to query for a folder where the file should be saved.
         var options = {
             clientId: parent.applicationId,
             action: "query",
@@ -226,8 +159,10 @@ var markdownEditor = {
                 queryParameters: "select=id,name,parentReference"
             },
             success: function (selection) {
-                var folder = selection.value[0];
                 // The return here is the folder where we need to upload the item
+                var folder = selection.value[0]; 
+                
+                // Update the lastSelectedFile item with the details of the new destination folder
                 if (!parent.lastSelectedFile) {
                     parent.lastSelectedFile = { 
                         id: null,
@@ -242,9 +177,13 @@ var markdownEditor = {
                     parent.lastSelectedFile.parentReference.id = folder.id
                 }
                 
-                // Store the access token from the file picker
+                // Store the access token from the file picker, so we don't need to get a new one
                 parent.accessToken = { accessToken: selection.accessToken };
-                parent.retrievePassiveAccessToken(parent.user, parent.saveFileWithToken, { parent: parent, alert: "File was saved to '" + folder.name + "' successfully.", uploadIntoParentFolder: true });
+                // Call the saveFileWithToken method, which will write this file back with Microsoft Graph
+                parent.retrievePassiveAccessToken(parent.user, parent.saveFileWithToken, 
+                { parent: parent, 
+                  alert: "File was saved to '" + folder.name + "' successfully.",
+                  uploadIntoParentFolder: true });
             },
             error: function (e) {
                 window.alert("An error occured while saving the file: " + e);
@@ -255,14 +194,7 @@ var markdownEditor = {
         OneDrive.save(options);
     },
 
-    // Clear the current editor buffer and reset any local state so we don't
-    // overwrite an existing file by mistake.
-    createNewFile: function () {
-        this.openFileID = "";
-        this.setFilename(this.defaultFileName);
-        $("#canvas").attr("disabled", false);
-        $("#canvas").val("");
-    },
+    /************ Rename File *************/
 
     // Rename the currently open file by providing a new name for the file via an input
     // dialog
@@ -283,15 +215,99 @@ var markdownEditor = {
                   propertyList: [ "name" ]});
         }
     },
-    
+
+    // Patch a DriveItem via the Microsoft Graph. Expects an access token and the state
+    // parameter to have a driveItem, propertyList, and parent (reference to this object) properties.
+    // driveItem is the item to update, which needs to have its id and parentReference.driveId property set to the item to patch.
+    // propertyList is an array of properties on the driveItem that will be submitted as the patch. These must be top-level properties of the driveItem
+    patchDriveItemWithToken: function(token, state) {
+        if (token == null) {
+            // An error occured and we don't have a token available to save.
+            window.alert("Unable to save file due to an authentication error. Try using Save As instead.");
+            return;
+        }
+        
+        if (state == null) {
+            window.alert("The state parameter is required for this method.");
+            return;
+        }
+
+        var item = state.driveItem;
+        var propList = state.propertyList;
+        var parent = state.parent;
+        
+        // For PATCH we don't invoke the picker, we're going to use the REST API directly
+        var url = parent.generateGraphUrl(item, false, false);
+
+        // Create a new XMLHttpRequest() and execute it.
+        var xhr = new XMLHttpRequest();
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState == 4) {
+                // Need to update parent.lastSelectedFile with the response from this 
+                // request so future saves go to the right place
+                var uploadedItem = JSON.parse(xhr.responseText);
+                if (uploadedItem && uploadedItem.name && uploadedItem.parentReference )
+                    parent.lastSelectedFile = uploadedItem;
+                if (state.alert) {
+                    window.alert(state.alert);
+                } else {
+                    window.alert("File saved successfully.");
+                }
+            }
+        }
+        xhr.onerror = function() {
+            window.alert("Error occured patching file metadata.");
+        }
+
+        xhr.open("PATCH", url, true);
+        xhr.setRequestHeader("Content-type", "application/json");
+        xhr.setRequestHeader("Authorization", "Bearer " + parent.accessToken.accessToken)
+
+        // Copy the values into patchData from the driveItem, based on names of properties in propertyList
+        var patchData = { };
+        for(var i=0, len = propList.length; i < len; i++)
+        {
+            patchData[propList[i]] = item[propList[i]];
+        }
+        xhr.send(JSON.stringify(patchData));
+    },
+
+    // Used to generate the Microsoft Graph URL for a target item, with a few parameters
+    // uploadIntoParentFolder: bool, indicates that we should be targeting the parent folder + filename instead of the item itself
+    // targetContentStream: bool, indicates we should append /content to the item URL
+    generateGraphUrl: function(driveItem, uploadIntoParentFolder, targetContentStream) {
+        var url = "https://graph.microsoft.com/v1.0/";
+        if (uploadIntoParentFolder)
+        {
+            url += "drives/" + driveItem.parentReference.driveId + "/items/" +driveItem.parentReference.id + "/children/" + driveItem.name;
+        } else {
+            url += "drives/" + driveItem.parentReference.driveId + "/items/" + driveItem.id;
+        }
+
+        if (targetContentStream)
+            url += "/content";
+
+        return url;
+    },
+
+
+    /************ Create New File *************/
+
+    // Clear the current editor buffer and reset any local state so we don't
+    // overwrite an existing file by mistake.
+    createNewFile: function () {
+        this.lastSelectedFile = null;
+        this.setFilename(this.defaultFileName);
+        $("#canvas").attr("disabled", false);
+        this.setEditorBody("");
+    },
+
+   
+    /************ Utility functions *************/
+
     // Set the contents of the editor to a new value.
     setEditorBody: function (text) {
         $("#canvas").val(text);
-    },
-
-    // Convert a text string into a data URI by base64 encoding the text.
-    encodeTextAsDataUrl: function (text) {
-        return "data:text/plain;base64," + window.btoa(text);
     },
 
     // State and function to connect elements in the HTML page to actions in the markdown editor.
@@ -318,16 +334,6 @@ var markdownEditor = {
         }
     },
 
-    // Parse query string parmaeters and return the value of a parameter
-    getQueryStringParameterByName: function (name, url) {
-			name = name.replace(/[\[\]]/g, "\\$&");
-			var regex = new RegExp("[?&#]" + name + "(=([^&#]*)|&|#|$)");
-			var results = regex.exec(url);
-			if (!results) return null;
-			if (!results[2]) return '';
-			return decodeURIComponent(results[2].replace(/\+/g, " "));
-    },
-
     // Uses a hidden iframe to request a new access token for Microsoft Graph, so we can make
     // Microsoft Graph calls outside of the picker context.
     // action is a function that takes two argument, the access token and a state value
@@ -338,52 +344,67 @@ var markdownEditor = {
             return;
         }
 
-        var parent = this;
-        var authorizeEndpoint = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
-        var authorizeParameters = "?client_id=" + this.applicationId + 
-            "&response_type=token" + 
-            "&scope=Files.ReadWrite" + 
-            "&redirect_uri=" + encodeURIComponent(this.redirectUrl) + 
-            "&prompt=none" + 
-            "&domain_hint=" + encodeURIComponent(user.domain) + 
-            "&login_hint=" + encodeURIComponent(user.login);
+        // NOTE: The following code is not used in this example currently, but would allow
+        // JavaScript to generate new tokens as long as the user is still signed into AAD/MSA.
 
-        var iframe = $("<iframe />").attr({
-            width: 1,
-            height: 1,
-            src: authorizeEndpoint + authorizeParameters
-        })
-        $(document.body).append(iframe);
-        iframe.on("load", function(iframeData) {
-            parent.parseAccessTokenFromIFrame(iframeData, action, state);
-        });
+        // var parent = this;
+        // var authorizeEndpoint = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
+        // var authorizeParameters = "?client_id=" + this.applicationId + 
+        //     "&response_type=token" + 
+        //     "&scope=Files.ReadWrite" + 
+        //     "&redirect_uri=" + encodeURIComponent(this.redirectUrl) + 
+        //     "&prompt=none" + 
+        //     "&domain_hint=" + encodeURIComponent(user.domain) + 
+        //     "&login_hint=" + encodeURIComponent(user.login);
+
+        // var iframe = $("<iframe />").attr({
+        //     width: 1,
+        //     height: 1,
+        //     src: authorizeEndpoint + authorizeParameters
+        // })
+        // $(document.body).append(iframe);
+        // iframe.on("load", function(iframeData) {
+        //     parent.parseAccessTokenFromIFrame(iframeData, action, state);
+        // });
     },
 
+    // NOTE: The following code is not used in this example currently, but would allow
+    // JavaScript to generate new tokens as long as the user is still signed into AAD/MSA.
     // Parse the token values from the iframe result
-    parseAccessTokenFromIFrame: function(iframeData, action, state) {
-        var frameHref = "";
-        try {
-            // this will throw for any issues other than succes
-            frameHref = iframeData.currentTarget.contentWindow.location.href;
-        }
-        catch (error) {
-            action(null, state);
-            return;
-        }
+    // parseAccessTokenFromIFrame: function(iframeData, action, state) {
+    //     var frameHref = "";
+    //     try {
+    //         // this will throw for any issues other than succes
+    //         frameHref = iframeData.currentTarget.contentWindow.location.href;
+    //     }
+    //     catch (error) {
+    //         action(null, state);
+    //         return;
+    //     }
 
-        // parse the iframe query string
-        var accessToken = this.getQueryStringParameterByName("access_token", frameHref);
-        var expiresInSeconds = this.getQueryStringParameterByName("expires_in", frameHref);
+    //     // parse the iframe query string
+    //     var accessToken = this.getQueryStringParameterByName("access_token", frameHref);
+    //     var expiresInSeconds = this.getQueryStringParameterByName("expires_in", frameHref);
 
-        if (accessToken != null) {
-            this.accessToken = { accessToken: accessToken, expiresInSeconds: expiresInSeconds };
-        }
+    //     if (accessToken != null) {
+    //         this.accessToken = { accessToken: accessToken, expiresInSeconds: expiresInSeconds };
+    //     }
     
-        var iframe = $(iframeData.currentTarget);
-        iframe.remove();
+    //     var iframe = $(iframeData.currentTarget);
+    //     iframe.remove();
 
-        action(this.accessToken, state);
-    },
+    //     action(this.accessToken, state);
+    // },
+
+    // Parse query string parmaeters and return the value of a parameter
+    // getQueryStringParameterByName: function (name, url) {
+	// 		name = name.replace(/[\[\]]/g, "\\$&");
+	// 		var regex = new RegExp("[?&#]" + name + "(=([^&#]*)|&|#|$)");
+	// 		var results = regex.exec(url);
+	// 		if (!results) return null;
+	// 		if (!results[2]) return '';
+	// 		return decodeURIComponent(results[2].replace(/\+/g, " "));
+    // },
 
     // An object representing the currently selected file
     lastSelectedFile: null,
@@ -392,10 +413,9 @@ var markdownEditor = {
     accessToken: null,
 
     user: {
-        id: "rgregg@odspdevelopers.com",
+        id: "nouser@contoso.com",
         domain: "organizations"
     }
-
 }
 
 $("#canvas").attr("disabled", true);
