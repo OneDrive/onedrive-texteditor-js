@@ -11,8 +11,8 @@
   <link rel="stylesheet" href="css/custom.style.css">
   <script text="text/javascript" src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-2.1.4.min.js"></script>
   
-  <!-- Include the OneDrive SDK from CDN or locally, reference client IDs -->
-  <script type="text/javascript" src="https://js.live.net/v7.1/OneDrive.js"></script>
+  <!-- Include the OneDrive SDK from CDN https://js.live.net/v7.1/OneDrive.js -->
+  <script type="text/javascript" src="js/OneDrive.debug.js"></script>
 </head>
 
 <body>
@@ -40,7 +40,7 @@
 
         <li class="ms-NavBar-item">
             <!-- Current item filename, which you can click to change -->
-            <a class="ms-NavBar-link" href="#" id="renameFileCommand">textfile1.md</a>
+            <a class="ms-NavBar-link" href="#" id="renameFileCommand"></a>
         </li>
 
       <li class="ms-NavBar-item ms-NavBar-item--right">
@@ -59,11 +59,11 @@
   <script type="text/javascript">
   
     $(document).ready(function () {
-      markdownEditor.wireUpCommandButton(document.getElementById("newFileCommand"), "new");
-      markdownEditor.wireUpCommandButton(document.getElementById("openFileCommand"), "open");
-      markdownEditor.wireUpCommandButton(document.getElementById("saveFileCommand"), "save");
-      markdownEditor.wireUpCommandButton(document.getElementById("saveAsFileCommand"), "saveAs");
-      markdownEditor.wireUpCommandButton(document.getElementById("renameFileCommand"), "rename");
+      markdownEditor.wireUpCommandButton($("#newFileCommand")[0], "new");
+      markdownEditor.wireUpCommandButton($("#openFileCommand")[0], "open");
+      markdownEditor.wireUpCommandButton($("#saveFileCommand")[0], "save");
+      markdownEditor.wireUpCommandButton($("#saveAsFileCommand")[0], "saveAs");
+      markdownEditor.wireUpCommandButton($("#renameFileCommand")[0], "rename");
     })
     
   </script>
