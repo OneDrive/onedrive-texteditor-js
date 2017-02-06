@@ -1,6 +1,17 @@
-.textEditor {
-    margin-top: 10px;
-    height: 600px;
+body {
+  height: 100%;
+}
+div.textEditor {
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    width: auto;
+    height: auto;
+    top: 60px;
+    bottom: 10px;
+    box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    -webkit-box-sizing: border-box;
 }
 
 
@@ -12,4 +23,5 @@ textarea#canvas {
   box-sizing: border-box;
   -moz-box-sizing: border-box;
   -webkit-box-sizing: border-box;
+  resize: none;
 }
