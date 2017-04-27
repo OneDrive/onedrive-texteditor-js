@@ -1,8 +1,8 @@
 // Copyright (c) Microsoft. All rights reserved. Licensed under the MIT license. See LICENSE in the project root for license information.
 
 var markdownEditor = {
-    applicationId: "02590d81-45de-4e3d-a722-4f558244f068",
-    redirectUrl: "http://localhost:9999/index.html",
+    applicationId: "6a5a9533-7bde-4ab3-a5e7-945130bbfd82",
+	redirectUrl: "http://localhost:9999/index.html",
     defaultFileName: "textfile1.txt",
 
     /************ Open *************/
@@ -19,7 +19,8 @@ var markdownEditor = {
             multiSelect: false,
             advanced: {
                 filter: ".md,.mdown,.txt",
-                queryParameters: "select=*,name,size"
+                queryParameters: "select=*,name,size",
+                scopes: ["Files.ReadWrite"]
             },
             success: function (files) {
                 // Get the first selected file (since we're not doing multi-select) and open it
@@ -278,6 +279,7 @@ var markdownEditor = {
     // overwrite an existing file by mistake.
     createNewFile: function () {
         this.lastSelectedFile = null;
+		this.openFileID = "";
         this.setFilename(this.defaultFileName);
         $("#canvas").attr("disabled", false);
         this.setEditorBody("");

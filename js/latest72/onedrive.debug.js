@@ -6,7 +6,8 @@ var __extends = (this && this.__extends) || function (d, b) {for (var p in b) if
     var Constants = function () {
         function Constants() {
         }
-        Constants.SDK_VERSION = 'js-v7.1';
+        Constants.SDK_VERSION_NUMBER = '7.2';
+        Constants.SDK_VERSION = 'js-v' + Constants.SDK_VERSION_NUMBER;
         Constants.TYPE_BOOLEAN = 'boolean';
         Constants.TYPE_FUNCTION = 'function';
         Constants.TYPE_OBJECT = 'object';
@@ -95,8 +96,8 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
     var POLLING_COUNTER = 5;
     var MAXIMUM_POLLING_INTERVAL = 30 * 60 * 1000;
     var ROOT_ID = 'root';
-    function getItem(itemId, apiRequestConfig, queryParameters) {
-        var getRequestUrl = buildPathToItem(itemId, apiRequestConfig.apiEndpointUrl);
+    function getItem(item, apiRequestConfig, queryParameters) {
+        var getRequestUrl = buildPathToItem(item, apiRequestConfig.apiEndpointUrl);
         if (queryParameters) {
             getRequestUrl = UrlUtilities_1.appendToPath(getRequestUrl, '?' + queryParameters);
         }
@@ -107,7 +108,7 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
             apiEndpoint: apiRequestConfig.apiEndpoint,
             headers: { 'Authorization': 'bearer ' + apiRequestConfig.accessToken }
         });
-        Logging_1.default.logMessage('performing GET on item with id: ' + itemId);
+        Logging_1.default.logMessage('performing GET on item with id: ' + item.id);
         return new es6_promise_1.Promise(function (resolve, reject) {
             xhr.start(function (xhr, statusCode) {
                 var itemInDetail = JSON.parse(xhr.responseText);
@@ -129,11 +130,10 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
         };
         for (var _i = 0, _a = items.value; _i < _a.length; _i++) {
             var item = _a[_i];
-            filesPromises.push(getItem(item.id, apiRequestConfig, queryParameters));
+            filesPromises.push(getItem(item, apiRequestConfig, queryParameters));
         }
         return es6_promise_1.Promise.all(filesPromises).then(function (successFiles) {
             processedFiles.value = successFiles;
-            processedFiles.accessToken = apiRequestConfig.accessToken;
             return processedFiles;
         }, function (error) {
             Logging_1.default.logError('Received ajax error.', error);
@@ -142,7 +142,7 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
     }
     exports.getItems = getItems;
     function shareItem(item, apiRequestConfig, createLinkParameters) {
-        var shareRequestUrl = UrlUtilities_1.appendToPath(buildPathToItem(item.id, apiRequestConfig.apiEndpointUrl), StringUtilities_1.format('{0}.createLink', apiRequestConfig.apiActionNamingSpace));
+        var shareRequestUrl = UrlUtilities_1.appendToPath(buildPathToItem(item, apiRequestConfig.apiEndpointUrl), StringUtilities_1.format('{0}.createLink', apiRequestConfig.apiActionNamingSpace));
         var xhr = new XHR_1.default({
             url: shareRequestUrl,
             clientId: apiRequestConfig.clientId,
@@ -198,9 +198,9 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
                 reject(new OneDriveSdkError_1.default(ErrorType_1.default.fileReaderFailure, 'failed to read or upload the file, see console log for details'));
             };
             reader.onload = function (event) {
-                var uploadUrl = UrlUtilities_1.appendToPath(buildPathToItem(folder.id, apiRequestConfig.apiEndpointUrl), 'children/' + itemDescription.name + '/content');
+                var uploadUrl = UrlUtilities_1.appendToPath(buildPathToItem(folder, apiRequestConfig.apiEndpointUrl), 'children(\'' + itemDescription.name + '\')/content');
                 var queryParameters = {};
-                queryParameters['@name.conflictBehavior'] = 'rename';
+                queryParameters['@name.conflictBehavior'] = itemDescription['@name.conflictBehavior'];
                 var requestHeaders = {};
                 requestHeaders['Authorization'] = 'bearer ' + apiRequestConfig.accessToken;
                 requestHeaders['Content-Type'] = 'multipart/form-data';
@@ -232,7 +232,7 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
                 reject(new OneDriveSdkError_1.default(ErrorType_1.default.unsupportedFeature, 'URL upload not supported for OneDrive business'));
             });
         }
-        var uploadUrl = UrlUtilities_1.appendToPath(buildPathToItem(folder.id, apiRequestConfig.apiEndpointUrl), 'children');
+        var uploadUrl = UrlUtilities_1.appendToPath(buildPathToItem(folder, apiRequestConfig.apiEndpointUrl), 'children');
         var requestHeaders = {};
         requestHeaders['Prefer'] = 'respond-async';
         requestHeaders['Authorization'] = 'bearer ' + apiRequestConfig.accessToken;
@@ -251,7 +251,8 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
         } else if (UrlUtilities_1.isPathFullUrl(sourceUri)) {
             return saveItemByHttpUrlUpload(xhr).then(function (location) {
                 return beginPolling(location).then(function (resourceId) {
-                    return getItem(resourceId, apiRequestConfig).then(function (file) {
+                    var file = { id: resourceId };
+                    return getItem(file, apiRequestConfig).then(function (file) {
                         var response = {
                             webUrl: null,
                             value: [file]
@@ -373,13 +374,19 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
             });
         });
     }
-    function buildPathToItem(itemId, apiEndpointUrl) {
-        var subPath = 'drive/' + (itemId === ROOT_ID ? 'root' : 'items/' + itemId);
+    function buildPathToItem(item, apiEndpointUrl) {
+        var subPath;
+        if (item.parentReference && item.parentReference.driveId) {
+            subPath = UrlUtilities_1.appendToPath('drives', item.parentReference.driveId);
+        } else {
+            subPath = 'drive';
+        }
+        subPath = UrlUtilities_1.appendToPath(subPath, item.id === ROOT_ID ? 'root' : 'items/' + item.id);
         return UrlUtilities_1.appendToPath(apiEndpointUrl, subPath);
     }
 }(require, exports, require('../models/ApiEndpoint'), require('../models/ErrorType'), require('../utilities/Logging'), require('../utilities/ObjectUtilities'), require('../models/OneDriveSdkError'), require('../utilities/StringUtilities'), require('../utilities/UrlUtilities'), require('../utilities/XHR'), require('es6-promise')));
 },{"../models/ApiEndpoint":11,"../models/ErrorType":13,"../models/OneDriveSdkError":16,"../utilities/Logging":27,"../utilities/ObjectUtilities":28,"../utilities/StringUtilities":30,"../utilities/UrlUtilities":32,"../utilities/XHR":33,"es6-promise":34}],5:[function(require,module,exports){
-(function (require, exports, ApiEndpoint_1, ApiRequest_1, Constants_1, DomainHint_1, ErrorHandler_1, ErrorType_1, Logging_1, LoginCache_1, OauthEndpoint_1, Oauth_1, OneDriveSdkError_1, PickerUX_1, Popup_1, es6_promise_1, StringUtilities_1, UrlUtilities_1) {
+(function (require, exports, ApiEndpoint_1, ApiRequest_1, Constants_1, DomainHint_1, ErrorHandler_1, ErrorType_1, Logging_1, LoginCache_1, Oauth_1, OneDriveSdkError_1, PickerUX_1, Popup_1, es6_promise_1, StringUtilities_1, UrlUtilities_1) {
     'use strict';
     var Invoker = function () {
         function Invoker(invokerOptions) {
@@ -414,8 +421,12 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
                     return _this.launch(true);
                 } else if (response.type === 'success') {
                     var items = [];
+                    var isMicrosoftApp = false;
                     for (var _i = 0, _a = response.items; _i < _a.length; _i++) {
                         var item = _a[_i];
+                        if (item.driveItem && !isMicrosoftApp) {
+                            isMicrosoftApp = true;
+                        }
                         items.push(item);
                     }
                     var successResponse = {
@@ -423,13 +434,21 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
                         value: items
                     };
                     var successPromise = void 0;
-                    if (invokerOptions.needAPICall()) {
+                    if (!invokerOptions.needAPICall() || isMicrosoftApp && invokerOptions.accessToken.toLowerCase() === 'rps') {
+                        successPromise = es6_promise_1.Promise.resolve(successResponse);
+                    } else {
                         _this.apiRequestConfig = _this.buildApiConfig();
                         successPromise = _this.makeApiRequest(successResponse);
-                    } else {
-                        successPromise = es6_promise_1.Promise.resolve(successResponse);
                     }
                     return successPromise.then(function (files) {
+                        if (_this.oauthResponse) {
+                            files.accessToken = _this.oauthResponse.accessToken;
+                        }
+                        if (_this.apiRequestConfig) {
+                            files.apiEndpoint = _this.apiRequestConfig.apiEndpointUrl;
+                        } else if (_this.loginHint && _this.loginHint.endpointHint === DomainHint_1.default.aad) {
+                            files.apiEndpoint = UrlUtilities_1.appendToPath(Constants_1.default.GRAPH_URL, 'me');
+                        }
                         invokerOptions.success(files);
                         return files;
                     });
@@ -445,7 +464,7 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
         Invoker.prototype.buildOauthPromise = function (switchAccount) {
             var oauthPromise;
             if (switchAccount || this.invokerOptions.needOauth()) {
-                oauthPromise = Oauth_1.auth(this.buildOauthConfig(switchAccount), this.popup);
+                oauthPromise = Oauth_1.auth(Oauth_1.buildOauthConfig(this.invokerOptions, switchAccount), this.popup);
             } else {
                 oauthPromise = es6_promise_1.Promise.resolve(null);
             }
@@ -463,10 +482,10 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
                 }
                 loginHint = {
                     loginHint: null,
+                    domainHint: null,
                     timeStamp: null,
                     apiEndpoint: this.invokerOptions.endpointHint === DomainHint_1.default.msa ? ApiEndpoint_1.default.msa : ApiEndpoint_1.default.filesV2,
-                    endpointHint: this.invokerOptions.endpointHint === DomainHint_1.default.msa ? DomainHint_1.default.msa : DomainHint_1.default.tenant,
-                    domainHint: this.invokerOptions.endpointHint === DomainHint_1.default.msa ? "consumers" : "organizations"
+                    endpointHint: this.invokerOptions.endpointHint === DomainHint_1.default.msa ? DomainHint_1.default.msa : DomainHint_1.default.tenant
                 };
             }
             this.loginHint = loginHint;
@@ -478,7 +497,17 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
             }
             return tenantPromise.then(function (tenantUrl) {
                 _this.pickerUX = PickerUX_1.generatePickerUX(loginHint.apiEndpoint, loginHint.endpointHint === DomainHint_1.default.tenant ? _this.invokerOptions.siteUrl : tenantUrl);
-                return _this.pickerUX.invokePickerUX(_this.buildPickerUXConfig(_this.invokerOptions), _this.popup);
+                var pickerUXConfig = _this.buildPickerUXConfig(_this.invokerOptions);
+                if (_this.invokerOptions.navEntryLocation) {
+                    pickerUXConfig.entryLocation = _this.invokerOptions.navEntryLocation;
+                }
+                if (_this.invokerOptions.navSourceTypes) {
+                    pickerUXConfig.sourceTypes = _this.invokerOptions.navSourceTypes;
+                }
+                if (_this.invokerOptions.linkType) {
+                    pickerUXConfig.linkType = _this.invokerOptions.linkType;
+                }
+                return _this.pickerUX.invokePickerUX(pickerUXConfig, _this.popup);
             });
         };
         Invoker.prototype.getApiRequestConfig = function () {
@@ -519,31 +548,6 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
             };
             return apiRequestConfig;
         };
-        Invoker.prototype.buildOauthConfig = function (switchAccount) {
-            var endpoint;
-            var invokerOptions = this.invokerOptions;
-            switch (invokerOptions.endpointHint) {
-            case DomainHint_1.default.aad:
-                endpoint = OauthEndpoint_1.default.AADv2;
-                break;
-            case DomainHint_1.default.msa:
-                endpoint = OauthEndpoint_1.default.MSA;
-                break;
-            case DomainHint_1.default.tenant:
-                endpoint = OauthEndpoint_1.default.AAD;
-                break;
-            }
-            var loginHint = LoginCache_1.getLoginHint(this.invokerOptions);
-            return {
-                clientId: invokerOptions.clientId,
-                endpoint: endpoint,
-                loginHint: invokerOptions.loginHint || (loginHint ? loginHint.loginHint : null),
-                origin: window.location.origin,
-                readOnly: !invokerOptions.needWritePermission(),
-                redirectUri: invokerOptions.redirectUri,
-                switchAccount: switchAccount
-            };
-        };
         Invoker.prototype.cleanPopupAndIFrame = function () {
             if (this.popup) {
                 this.popup.close();
@@ -556,8 +560,8 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
     }();
     Object.defineProperty(exports, '__esModule', { value: true });
     exports.default = Invoker;
-}(require, exports, require('../models/ApiEndpoint'), require('./ApiRequest'), require('../Constants'), require('../models/DomainHint'), require('../utilities/ErrorHandler'), require('../models/ErrorType'), require('../utilities/Logging'), require('./LoginCache'), require('../models/OauthEndpoint'), require('./Oauth'), require('../models/OneDriveSdkError'), require('./PickerUX'), require('../utilities/Popup'), require('es6-promise'), require('../utilities/StringUtilities'), require('../utilities/UrlUtilities')));
-},{"../Constants":1,"../models/ApiEndpoint":11,"../models/DomainHint":12,"../models/ErrorType":13,"../models/OauthEndpoint":15,"../models/OneDriveSdkError":16,"../utilities/ErrorHandler":26,"../utilities/Logging":27,"../utilities/Popup":29,"../utilities/StringUtilities":30,"../utilities/UrlUtilities":32,"./ApiRequest":4,"./LoginCache":6,"./Oauth":7,"./PickerUX":9,"es6-promise":34}],6:[function(require,module,exports){
+}(require, exports, require('../models/ApiEndpoint'), require('./ApiRequest'), require('../Constants'), require('../models/DomainHint'), require('../utilities/ErrorHandler'), require('../models/ErrorType'), require('../utilities/Logging'), require('./LoginCache'), require('./Oauth'), require('../models/OneDriveSdkError'), require('./PickerUX'), require('../utilities/Popup'), require('es6-promise'), require('../utilities/StringUtilities'), require('../utilities/UrlUtilities')));
+},{"../Constants":1,"../models/ApiEndpoint":11,"../models/DomainHint":12,"../models/ErrorType":13,"../models/OneDriveSdkError":16,"../utilities/ErrorHandler":26,"../utilities/Logging":27,"../utilities/Popup":29,"../utilities/StringUtilities":30,"../utilities/UrlUtilities":32,"./ApiRequest":4,"./LoginCache":6,"./Oauth":7,"./PickerUX":9,"es6-promise":34}],6:[function(require,module,exports){
 (function (require, exports, ApiEndpoint_1, Cache_1, Constants_1, DomainHint_1, ErrorHandler_1, ErrorType_1, OneDriveSdkError_1, ObjectUtilities_1) {
     'use strict';
     var ACCESS_TOKEN_LIFESPAN = 3600000;
@@ -590,9 +594,9 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
     exports.loginHintExpired = loginHintExpired;
     function updateLoginHint(clientId, idToken, invokerOptions) {
         var loginHint;
+        var domainHint;
         var endpointHint;
         var apiEndpoint;
-        var domainHint;
         switch (invokerOptions.endpointHint) {
         case DomainHint_1.default.aad:
             var idTokenObj = this.parseIdToken(idToken);
@@ -610,18 +614,20 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
             apiEndpoint = ApiEndpoint_1.default.msa;
             endpointHint = DomainHint_1.default.msa;
             loginHint = invokerOptions.loginHint;
+            domainHint = "consumers";
             break;
         case DomainHint_1.default.tenant:
             apiEndpoint = ApiEndpoint_1.default.filesV2;
             endpointHint = DomainHint_1.default.tenant;
             loginHint = invokerOptions.loginHint;
+            domainHint = "organizations";
             break;
         }
         var newLoginHint = {
             apiEndpoint: apiEndpoint,
             loginHint: loginHint,
-            endpointHint: endpointHint,
             domainHint: domainHint,
+            endpointHint: endpointHint,
             timeStamp: new Date().getTime()
         };
         var loginCache = Cache_1.getCacheItem(LOGINHINT_KEY) || {};
@@ -651,7 +657,7 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
     exports.parseIdToken = parseIdToken;
 }(require, exports, require('../models/ApiEndpoint'), require('../utilities/Cache'), require('../Constants'), require('../models/DomainHint'), require('../utilities/ErrorHandler'), require('../models/ErrorType'), require('../models/OneDriveSdkError'), require('../utilities/ObjectUtilities')));
 },{"../Constants":1,"../models/ApiEndpoint":11,"../models/DomainHint":12,"../models/ErrorType":13,"../models/OneDriveSdkError":16,"../utilities/Cache":22,"../utilities/ErrorHandler":26,"../utilities/ObjectUtilities":28}],7:[function(require,module,exports){
-(function (require, exports, Channel_1, DomUtilities_1, ErrorHandler_1, ErrorType_1, OauthEndpoint_1, OneDriveSdkError_1, es6_promise_1, UrlUtilities_1) {
+(function (require, exports, Channel_1, DomainHint_1, DomUtilities_1, ErrorHandler_1, ErrorType_1, LoginCache_1, OauthEndpoint_1, OneDriveSdkError_1, es6_promise_1, UrlUtilities_1) {
     'use strict';
     var PARAM_ACCESS_TOKEN = 'access_token';
     var PARAM_ERROR = 'error';
@@ -733,10 +739,14 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
             break;
         }
         if (oauthConfig.switchAccount) {
-            url = UrlUtilities_1.appendQueryString(url, 'prompt', 'login');
+            url = UrlUtilities_1.appendQueryString(url, 'prompt', 'select_account');
         } else if (oauthConfig.loginHint) {
             url = UrlUtilities_1.appendQueryString(url, 'login_hint', oauthConfig.loginHint);
+            if (oauthConfig.domainHint) {
+               url = UrlUtilities_1.appendQueryString(url, 'domain_hint', oauthConfig.domainHint);
+            }
         }
+        
         UrlUtilities_1.redirect(url);
     }
     function buildAADOauthUrl(config) {
@@ -749,7 +759,9 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
         });
     }
     function buildAADOauthV2Url(config) {
-        var scope = 'profile openid https://graph.microsoft.com/User.Read ' + (config.readOnly ? 'https://graph.microsoft.com/Files.Read' : 'https://graph.microsoft.com/Files.ReadWrite');
+        var scope = 'profile openid https://graph.microsoft.com/User.Read ' + config.scopes.map(function (s) {
+            return 'https://graph.microsoft.com/' + s;
+        }).join(' ');
         var url = UrlUtilities_1.appendQueryStrings(AADV2_OAUTH_ENDPOINT, {
             redirect_uri: config.redirectUri,
             client_id: config.clientId,
@@ -762,12 +774,17 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
         return url;
     }
     function buildMSAOauthUrl(config) {
+        var needWritePermission = false;
+        for (var _i = 0, _a = config.scopes; _i < _a.length; _i++) {
+            var scope = _a[_i];
+            needWritePermission = needWritePermission || scope.toLowerCase().indexOf('readwrite') > 1;
+        }
         return UrlUtilities_1.appendQueryStrings(MSA_OAUTH_ENDPONT, {
             redirect_uri: config.redirectUri,
             client_id: config.clientId,
             response_type: 'token',
             state: config.state,
-            scope: 'onedrive.' + (config.readOnly ? 'readonly' : 'readwrite')
+            scope: 'onedrive.' + (needWritePermission ? 'readwrite' : 'readonly')
         });
     }
     function auth(config, popupView) {
@@ -799,8 +816,37 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
         });
     }
     exports.auth = auth;
-}(require, exports, require('../utilities/Channel'), require('../utilities/DomUtilities'), require('../utilities/ErrorHandler'), require('../models/ErrorType'), require('../models/OauthEndpoint'), require('../models/OneDriveSdkError'), require('es6-promise'), require('../utilities/UrlUtilities')));
-},{"../models/ErrorType":13,"../models/OauthEndpoint":15,"../models/OneDriveSdkError":16,"../utilities/Channel":24,"../utilities/DomUtilities":25,"../utilities/ErrorHandler":26,"../utilities/UrlUtilities":32,"es6-promise":34}],8:[function(require,module,exports){
+    function buildOauthConfig(invokerOptions, switchAccount) {
+        var endpoint;
+        switch (invokerOptions.endpointHint) {
+        case DomainHint_1.default.aad:
+            endpoint = OauthEndpoint_1.default.AADv2;
+            break;
+        case DomainHint_1.default.msa:
+            endpoint = OauthEndpoint_1.default.MSA;
+            break;
+        case DomainHint_1.default.tenant:
+            endpoint = OauthEndpoint_1.default.AAD;
+            break;
+        }
+        var loginHint = LoginCache_1.getLoginHint(invokerOptions);
+        var scopes = invokerOptions.scopes.map(function (s) {
+            return s + (s.indexOf('Files.') > -1 && invokerOptions.needSharePointPermission ? '.All' : '');
+        });
+        return {
+            clientId: invokerOptions.clientId,
+            endpoint: endpoint,
+            scopes: scopes,
+            loginHint: invokerOptions.loginHint || (loginHint ? loginHint.loginHint : null),
+            domainHint: invokerOptions.domainHint || (loginHint ? loginHint.domainHint : null),
+            origin: window.location.origin,
+            redirectUri: invokerOptions.redirectUri,
+            switchAccount: switchAccount
+        };
+    }
+    exports.buildOauthConfig = buildOauthConfig;
+}(require, exports, require('../utilities/Channel'), require('../models/DomainHint'), require('../utilities/DomUtilities'), require('../utilities/ErrorHandler'), require('../models/ErrorType'), require('./LoginCache'), require('../models/OauthEndpoint'), require('../models/OneDriveSdkError'), require('es6-promise'), require('../utilities/UrlUtilities')));
+},{"../models/DomainHint":12,"../models/ErrorType":13,"../models/OauthEndpoint":15,"../models/OneDriveSdkError":16,"../utilities/Channel":24,"../utilities/DomUtilities":25,"../utilities/ErrorHandler":26,"../utilities/UrlUtilities":32,"./LoginCache":6,"es6-promise":34}],8:[function(require,module,exports){
 (function (require, exports, ApiEndpoint_1, ApiRequest_1, Constants_1, Invoker_1, ObjectUtilities_1, PickerOptions_1, PickerActionType_1, StringUtilities_1, UrlUtilities_1) {
     'use strict';
     var Picker = function (_super) {
@@ -814,18 +860,19 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
             return _super.prototype.launchInvoker.call(this);
         };
         Picker.prototype.buildPickerUXConfig = function (pickerOptions) {
-            return {
+            var pickerUXConfig = {
                 applicationId: pickerOptions.clientId,
                 accessLevel: Picker.ACCESS_LEVEL,
                 filter: pickerOptions.filter,
                 id: UrlUtilities_1.generateNonce(),
-                linkType: 'download',
+                navEnabled: pickerOptions.navEnabled,
                 origin: window.location.origin,
                 parentDiv: pickerOptions.parentDiv,
                 redirectUri: pickerOptions.redirectUri,
                 selectionMode: pickerOptions.multiSelect ? 'multiple' : 'single',
                 viewType: Picker.VIEW_TYPE
             };
+            return pickerUXConfig;
         };
         Picker.prototype.makeApiRequest = function (files) {
             if (this.invokerOptions.action === PickerActionType_1.default.share) {
@@ -838,14 +885,17 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
         Picker.prototype.queryItems = function (files, isDownload) {
             var itemQuery = this.invokerOptions.queryParameters || Constants_1.default.DEFAULT_QUERY_ITEM_PARAMETER;
             if (isDownload) {
-                itemQuery = StringUtilities_1.format('{0}{1}{2}', itemQuery, itemQuery.indexOf('select') === -1 ? '&select=' : ',', '@content.downloadUrl');
+                itemQuery = StringUtilities_1.format('{0}{1}{2}', itemQuery, itemQuery.indexOf('select') === -1 ? '&select=' : ',', 'name,size,@content.downloadUrl');
             }
             return ApiRequest_1.getItems(files, this.getApiRequestConfig(), itemQuery);
         };
         Picker.prototype.shareItems = function (files) {
+            var _this = this;
             var pickerOptions = this.invokerOptions;
             var createLinkParameters = pickerOptions.createLinkParameters || this.getDefaultSharingConfig();
-            return ApiRequest_1.shareItems(files, this.getApiRequestConfig(), createLinkParameters);
+            return ApiRequest_1.getItems(files, this.getApiRequestConfig()).then(function (files) {
+                return ApiRequest_1.shareItems(files, _this.getApiRequestConfig(), createLinkParameters);
+            });
         };
         Picker.prototype.getDefaultSharingConfig = function () {
             var createLinkParameters = { 'type': 'view' };
@@ -863,7 +913,7 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
     exports.default = Picker;
 }(require, exports, require('../models/ApiEndpoint'), require('./ApiRequest'), require('../Constants'), require('./Invoker'), require('../utilities/ObjectUtilities'), require('../models/PickerOptions'), require('../models/PickerActionType'), require('../utilities/StringUtilities'), require('../utilities/UrlUtilities')));
 },{"../Constants":1,"../models/ApiEndpoint":11,"../models/PickerActionType":17,"../models/PickerOptions":18,"../utilities/ObjectUtilities":28,"../utilities/StringUtilities":30,"../utilities/UrlUtilities":32,"./ApiRequest":4,"./Invoker":5}],9:[function(require,module,exports){
-(function (require, exports, ApiEndpoint_1, Channel_1, DomUtilities_1, ErrorHandler_1, ErrorType_1, Logging_1, OneDriveSdkError_1, UrlUtilities_1, es6_promise_1) {
+(function (require, exports, ApiEndpoint_1, Channel_1, DomUtilities_1, ErrorHandler_1, ErrorType_1, Logging_1, OneDriveSdkError_1, UrlUtilities_1, es6_promise_1, Constants_1) {
     'use strict';
     var CUSTOMER_PICKER_BASE_URL = 'https://onedrive.live.com/';
     var RESPONSE_PREFIX = '[OneDrive-FromPicker]';
@@ -881,8 +931,11 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
                 if (!tenantUrl) {
                     ErrorHandler_1.throwError(new OneDriveSdkError_1.default(ErrorType_1.default.optionsError, 'the site url must be specified')).exposeToPublic();
                 }
-                UrlUtilities_1.validateUrlProtocol(tenantUrl);
-                this.url = UrlUtilities_1.appendQueryString(tenantUrl + '_layouts/onedrive.aspx', 'p', '2');
+                UrlUtilities_1.validateUrlProtocol(tenantUrl, ['HTTPS']);
+                if (apiEndpoint === ApiEndpoint_1.default.graph_odb) {
+                    tenantUrl = UrlUtilities_1.appendToPath(tenantUrl, '_layouts/onedrive.aspx');
+                }
+                this.url = UrlUtilities_1.appendQueryString(tenantUrl, 'p', '2');
             }
         }
         PickerUX.prototype.invokePickerUX = function (uxConfig, popupView) {
@@ -916,20 +969,22 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
                     }
                 });
                 var pickerOption = {
-                    'aid': uxConfig.applicationId,
-                    'a': uxConfig.accessLevel,
-                    'id': uxConfig.id,
-                    'l': uxConfig.linkType,
-                    's': uxConfig.selectionMode,
-                    'f': uxConfig.filter,
-                    'v': uxConfig.viewType,
-                    'ru': uxConfig.redirectUri,
-                    'o': uxConfig.origin
+                    aid: uxConfig.applicationId,
+                    a: uxConfig.accessLevel,
+                    id: uxConfig.id,
+                    l: uxConfig.linkType,
+                    ln: uxConfig.navEnabled,
+                    s: uxConfig.selectionMode,
+                    f: uxConfig.filter,
+                    v: uxConfig.viewType,
+                    ru: uxConfig.redirectUri,
+                    o: uxConfig.origin,
+                    sdk: Constants_1.default.SDK_VERSION_NUMBER,
+                    e: uxConfig.entryLocation,
+                    st: uxConfig.sourceTypes,
+                    sn: !uxConfig.parentDiv,
+                    ss: !uxConfig.parentDiv
                 };
-                if (uxConfig.parentDiv) {
-                    pickerOption['sn'] = false;
-                    pickerOption['ss'] = false;
-                }
                 var pickerUrl = UrlUtilities_1.appendQueryString(_this.url, 'picker', JSON.stringify(pickerOption));
                 Logging_1.default.logMessage('invoke picker with url: ' + pickerUrl);
                 if (uxConfig.parentDiv) {
@@ -960,14 +1015,13 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
     }();
     Object.defineProperty(exports, '__esModule', { value: true });
     exports.default = PickerUX;
-}(require, exports, require('../models/ApiEndpoint'), require('../utilities/Channel'), require('../utilities/DomUtilities'), require('../utilities/ErrorHandler'), require('../models/ErrorType'), require('../utilities/Logging'), require('../models/OneDriveSdkError'), require('../utilities/UrlUtilities'), require('es6-promise')));
-},{"../models/ApiEndpoint":11,"../models/ErrorType":13,"../models/OneDriveSdkError":16,"../utilities/Channel":24,"../utilities/DomUtilities":25,"../utilities/ErrorHandler":26,"../utilities/Logging":27,"../utilities/UrlUtilities":32,"es6-promise":34}],10:[function(require,module,exports){
+}(require, exports, require('../models/ApiEndpoint'), require('../utilities/Channel'), require('../utilities/DomUtilities'), require('../utilities/ErrorHandler'), require('../models/ErrorType'), require('../utilities/Logging'), require('../models/OneDriveSdkError'), require('../utilities/UrlUtilities'), require('es6-promise'), require('../Constants')));
+},{"../Constants":1,"../models/ApiEndpoint":11,"../models/ErrorType":13,"../models/OneDriveSdkError":16,"../utilities/Channel":24,"../utilities/DomUtilities":25,"../utilities/ErrorHandler":26,"../utilities/Logging":27,"../utilities/UrlUtilities":32,"es6-promise":34}],10:[function(require,module,exports){
 (function (require, exports, ApiRequest_1, Constants_1, Invoker_1, ObjectUtilities_1, SaverActionType_1, SaverOptions_1, UploadType_1, UrlUtilities_1) {
     'use strict';
     var ACCESS_LEVEL = 'readwrite';
     var VIEW_TYPE = 'folders';
     var SELECTION_MODE = 'single';
-    var LINK_TYPE = 'download';
     var Saver = function (_super) {
         __extends(Saver, _super);
         function Saver(options) {
@@ -983,7 +1037,7 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
                 applicationId: saverOptions.clientId,
                 accessLevel: ACCESS_LEVEL,
                 id: UrlUtilities_1.generateNonce(),
-                linkType: LINK_TYPE,
+                navEnabled: saverOptions.navEnabled,
                 filter: saverOptions.filter,
                 origin: window.location.origin,
                 parentDiv: saverOptions.parentDiv,
@@ -1003,7 +1057,7 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
             } else if (saverOptions.uploadType === UploadType_1.default.form) {
                 var uploadItemDescription = {
                     name: saverOptions.fileName,
-                    '@name.conflictBehavior': 'rename'
+                    '@name.conflictBehavior': saverOptions.nameConflictBehavior
                 };
                 return ApiRequest_1.saveItemByFormUpload(files.value[0], uploadItemDescription, saverOptions.fileInput, this.apiRequestConfig, saverOptions.progress);
             }
@@ -1058,11 +1112,13 @@ module.exports = function (require, exports, OneDriveApp_1, Oauth_1) {
     exports.default = ErrorType;
 }(require, exports));
 },{}],14:[function(require,module,exports){
-module.exports = function (require, exports, CallbackInvoker_1, Constants_1, DomainHint_1, ErrorHandler_1, ErrorType_1, Logging_1, OneDriveSdkError_1, StringUtilities_1, TypeValidators_1, UrlUtilities_1) {
+(function (require, exports, CallbackInvoker_1, Constants_1, DomainHint_1, ErrorHandler_1, ErrorType_1, Logging_1, OneDriveSdkError_1, StringUtilities_1, TypeValidators_1, UrlUtilities_1) {
     'use strict';
     var AAD_APPID_PATTERN = new RegExp('^[a-fA-F\\d]{8}-([a-fA-F\\d]{4}-){3}[a-fA-F\\d]{12}$');
     var InvokerOptions = function () {
         function InvokerOptions(options) {
+            this.navEnabled = true;
+            this.needSharePointPermission = true;
             this.clientId = TypeValidators_1.validateType(options.clientId, Constants_1.default.TYPE_STRING);
             var cancelCallback = TypeValidators_1.validateCallback(options.cancel, true);
             this.cancel = function () {
@@ -1142,14 +1198,45 @@ module.exports = function (require, exports, CallbackInvoker_1, Constants_1, Dom
                     }
                     this.parentDiv = options.advanced.iframeParentDiv;
                 }
+                if (!!options.advanced.scopes) {
+                    if (typeof options.advanced.scopes === 'string') {
+                        this.scopes = [options.advanced.scopes];
+                    } else if (options.advanced.scopes instanceof Array) {
+                        this.scopes = options.advanced.scopes;
+                    }
+                }
+                this.linkType = options.advanced.linkType;
+                this.parseNavigationOptions(options.advanced.navigation);
                 this.loginHint = options.advanced.loginHint;
                 this.filter = options.advanced.filter;
             }
         };
+        InvokerOptions.prototype.parseNavigationOptions = function (navigation) {
+            if (navigation) {
+                var entryLocation = navigation.entryLocation;
+                if (entryLocation) {
+                    var _a = entryLocation.sharePoint, sitePath = _a.sitePath, listPath = _a.listPath;
+                    if (sitePath) {
+                        UrlUtilities_1.validateUrlProtocol(sitePath, ['HTTPS']);
+                    }
+                    if (listPath) {
+                        UrlUtilities_1.validateUrlProtocol(listPath, ['HTTPS']);
+                    }
+                    this.navEntryLocation = entryLocation;
+                }
+                var sourceTypes = navigation.sourceTypes instanceof Array ? navigation.sourceTypes : navigation.sourceTypes ? [navigation.sourceTypes] : null;
+                if (!!sourceTypes) {
+                    this.needSharePointPermission = !(sourceTypes.length === 1 && sourceTypes[0].toLowerCase() === 'onedrive');
+                    this.navSourceTypes = sourceTypes;
+                }
+                this.navEnabled = !navigation.disable;
+            }
+        };
         return InvokerOptions;
     }();
-    return InvokerOptions;
-}(require, exports, require('../utilities/CallbackInvoker'), require('../Constants'), require('./DomainHint'), require('../utilities/ErrorHandler'), require('./ErrorType'), require('../utilities/Logging'), require('./OneDriveSdkError'), require('../utilities/StringUtilities'), require('../utilities/TypeValidators'), require('../utilities/UrlUtilities'));
+    Object.defineProperty(exports, '__esModule', { value: true });
+    exports.default = InvokerOptions;
+}(require, exports, require('../utilities/CallbackInvoker'), require('../Constants'), require('./DomainHint'), require('../utilities/ErrorHandler'), require('./ErrorType'), require('../utilities/Logging'), require('./OneDriveSdkError'), require('../utilities/StringUtilities'), require('../utilities/TypeValidators'), require('../utilities/UrlUtilities')));
 },{"../Constants":1,"../utilities/CallbackInvoker":23,"../utilities/ErrorHandler":26,"../utilities/Logging":27,"../utilities/StringUtilities":30,"../utilities/TypeValidators":31,"../utilities/UrlUtilities":32,"./DomainHint":12,"./ErrorType":13,"./OneDriveSdkError":16}],15:[function(require,module,exports){
 (function (require, exports) {
     'use strict';
@@ -1193,7 +1280,7 @@ module.exports = function (require, exports, CallbackInvoker_1, Constants_1, Dom
     exports.default = PickerActionType;
 }(require, exports));
 },{}],18:[function(require,module,exports){
-(function (require, exports, CallbackInvoker_1, Constants_1, InvokerOptions, Logging_1, PickerActionType_1, TypeValidators_1) {
+(function (require, exports, CallbackInvoker_1, Constants_1, InvokerOptions_1, Logging_1, PickerActionType_1, TypeValidators_1) {
     'use strict';
     var PickerOptions = function (_super) {
         __extends(PickerOptions, _super);
@@ -1210,15 +1297,15 @@ module.exports = function (require, exports, CallbackInvoker_1, Constants_1, Dom
             if (options.advanced) {
                 this.createLinkParameters = options.advanced.createLinkParameters;
             }
+            if (!this.scopes) {
+                this.scopes = [this.action === PickerActionType_1.default.share ? 'Files.ReadWrite' : 'Files.Read'];
+            }
         }
-        PickerOptions.prototype.needWritePermission = function () {
-            return this.action === PickerActionType_1.default.share;
-        };
         PickerOptions.prototype.needAPICall = function () {
             return !!this.queryParameters || this.action !== PickerActionType_1.default.query;
         };
         return PickerOptions;
-    }(InvokerOptions);
+    }(InvokerOptions_1.default);
     Object.defineProperty(exports, '__esModule', { value: true });
     exports.default = PickerOptions;
 }(require, exports, require('../utilities/CallbackInvoker'), require('../Constants'), require('./InvokerOptions'), require('../utilities/Logging'), require('./PickerActionType'), require('../utilities/TypeValidators')));
@@ -1234,7 +1321,7 @@ module.exports = function (require, exports, CallbackInvoker_1, Constants_1, Dom
     exports.default = SaverActionType;
 }(require, exports));
 },{}],20:[function(require,module,exports){
-(function (require, exports, CallbackInvoker_1, Constants_1, DomUtilities_1, ErrorHandler_1, ErrorType_1, InvokerOptions, Logging_1, OneDriveSdkError_1, SaverActionType_1, StringUtilities_1, TypeValidators_1, UploadType_1, UrlUtilities_1) {
+(function (require, exports, CallbackInvoker_1, Constants_1, DomUtilities_1, ErrorHandler_1, ErrorType_1, InvokerOptions_1, Logging_1, OneDriveSdkError_1, SaverActionType_1, StringUtilities_1, TypeValidators_1, UploadType_1, UrlUtilities_1) {
     'use strict';
     var SaverOptions = function (_super) {
         __extends(SaverOptions, _super);
@@ -1257,12 +1344,13 @@ module.exports = function (require, exports, CallbackInvoker_1, Constants_1, Dom
             if (this.action === SaverActionType_1.default.save) {
                 this._setFileInfo(options);
             }
+            this.nameConflictBehavior = TypeValidators_1.validateType(options.nameConflictBehavior, Constants_1.default.TYPE_STRING, true, 'rename');
+            if (!this.scopes) {
+                this.scopes = ['Files.ReadWrite'];
+            }
         }
         SaverOptions.prototype.needAPICall = function () {
             return !!this.queryParameters || this.action === SaverActionType_1.default.save;
-        };
-        SaverOptions.prototype.needWritePermission = function () {
-            return this.action === SaverActionType_1.default.save;
         };
         SaverOptions.prototype._setFileInfo = function (options) {
             if (options.sourceInputElementId && options.sourceUri) {
@@ -1294,7 +1382,7 @@ module.exports = function (require, exports, CallbackInvoker_1, Constants_1, Dom
             }
         };
         return SaverOptions;
-    }(InvokerOptions);
+    }(InvokerOptions_1.default);
     Object.defineProperty(exports, '__esModule', { value: true });
     exports.default = SaverOptions;
 }(require, exports, require('../utilities/CallbackInvoker'), require('../Constants'), require('../utilities/DomUtilities'), require('../utilities/ErrorHandler'), require('./ErrorType'), require('./InvokerOptions'), require('../utilities/Logging'), require('./OneDriveSdkError'), require('./SaverActionType'), require('../utilities/StringUtilities'), require('../utilities/TypeValidators'), require('./UploadType'), require('../utilities/UrlUtilities')));
@@ -1597,7 +1685,7 @@ module.exports = function (require, exports, CallbackInvoker_1, Constants_1, Dom
 },{"../Constants":1,"./Logging":27}],29:[function(require,module,exports){
 (function (require, exports, ErrorHandler_1, ErrorType_1, Logging_1, OneDriveSdkError_1, UrlUtilities_1) {
     'use strict';
-    var POPUP_WIDTH = 800;
+    var POPUP_WIDTH = 1024;
     var POPUP_HEIGHT = 650;
     exports.POPUP_PINGER_INTERVAL = 500;
     var Popup = function () {
