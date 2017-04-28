@@ -1,8 +1,7 @@
 // Copyright (c) Microsoft. All rights reserved. Licensed under the MIT license. See LICENSE in the project root for license information.
 
 var markdownEditor = {
-    applicationId: "6a5a9533-7bde-4ab3-a5e7-945130bbfd82",
-	redirectUrl: "http://localhost:9999/index.html",
+    applicationId: "5fc58006-b25f-4eaf-8f30-527c6fa7e5f5",
     defaultFileName: "textfile1.txt",
 
     /************ Open *************/
