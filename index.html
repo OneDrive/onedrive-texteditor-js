@@ -17,6 +17,12 @@
 
 <body>
 
+<script>
+if ((window.location.host.startsWith("localhost")) && (window.location.protocol != "https:")) {
+    window.location.protocol = "https";
+}
+</script>
+
   <!-- Office Fabric UI NavBar -->
   <div class="ms-NavBar">
     <div class="ms-NavBar-openMenu js-openMenu"></div>
