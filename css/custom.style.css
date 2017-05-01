@@ -1,6 +1,7 @@
 body {
   height: 100%;
 }
+
 div.textEditor {
     position: absolute;
     left: 10px;
@@ -13,7 +14,6 @@ div.textEditor {
     -moz-box-sizing: border-box;
     -webkit-box-sizing: border-box;
 }
-
 
 textarea#canvas {
   font-family: Consolas;

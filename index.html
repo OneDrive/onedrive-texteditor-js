@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+
 <head>
   <title>OneDrive Text Editor Sample</title>
   <meta charset="utf-8" />
@@ -10,44 +11,50 @@
   <link rel="stylesheet" href="https://appsforoffice.microsoft.com/fabric/1.0/fabric.components.min.css">
   <link rel="stylesheet" href="css/custom.style.css">
   <script text="text/javascript" src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-2.1.4.min.js"></script>
-  
+
   <!-- Include the OneDrive SDK from CDN https://js.live.net/v7.2/OneDrive.js -->
-  <script type="text/javascript" src="js/latest72/OneDrive.debug.js"></script>
+  <script type="text/javascript" src="js/OneDrive.debug.js"></script>
 </head>
 
 <body>
 
-<script>
-if ((!window.location.host.startsWith("localhost")) && (window.location.protocol != "https:")) {
-    window.location.protocol = "https";
-}
-</script>
+  <script>
+    // Redirect to HTTPS when not running on localhost, so that the redirect URI works for auth
+    if ((!window.location.host.startsWith("localhost")) && (window.location.protocol != "https:")) {
+      window.location.protocol = "https";
+    }
+
+  </script>
 
   <!-- Office Fabric UI NavBar -->
   <div class="ms-NavBar">
     <div class="ms-NavBar-openMenu js-openMenu"></div>
     <ul class="ms-NavBar-items">
-        <li class="ms-NavBar-item">
-            <!-- Create new button -->
-            <a class="ms-NavBar-link" href="#" id="newFileCommand"><i class="ms-Icon ms-Icon--document"></i> Create New</a>
-        </li>
-        <li class="ms-NavBar-item">
-            <!-- Open Button to invoke the open picker -->
-            <a class="ms-NavBar-link" href="#" id="openFileCommand"><i class="ms-Icon ms-Icon--folder"></i> Open</a>
-        </li>
-        <li class="ms-NavBar-item">
-            <!-- Save button to save back without invoking the picker -->
-            <a class="ms-NavBar-link" href="#" id="saveFileCommand"><i class="ms-Icon ms-Icon--save"></i> Save</a>
-        </li>
-        <li class="ms-NavBar-item">
-            <!-- Save As button to invoke the picker in save mode -->
-            <a class="ms-NavBar-link" href="#" id="saveAsFileCommand">Save As</a>
-        </li>
+      <li class="ms-NavBar-item">
+        <!-- Create new button -->
+        <a class="ms-NavBar-link" href="#" id="newFileCommand"><i class="ms-Icon ms-Icon--document"></i> Create New</a>
+      </li>
+      <li class="ms-NavBar-item">
+        <!-- Open Button to invoke the open picker -->
+        <a class="ms-NavBar-link" href="#" id="openFileCommand"><i class="ms-Icon ms-Icon--folder"></i> Open</a>
+      </li>
+      <li class="ms-NavBar-item">
+        <!-- Save button to save back without invoking the picker -->
+        <a class="ms-NavBar-link" href="#" id="saveFileCommand"><i class="ms-Icon ms-Icon--save"></i> Save</a>
+      </li>
+      <li class="ms-NavBar-item">
+        <!-- Save As button to invoke the picker in save mode -->
+        <a class="ms-NavBar-link" href="#" id="saveAsFileCommand">Save As</a>
+      </li>
+      <li class="ms-NavBar-item">
+        <!-- Get a link button to call Graph API -->
+        <a class="ms-NavBar-link" href="#" id="shareFileCommand">Get Link</a>
+      </li>
 
-        <li class="ms-NavBar-item">
-            <!-- Current item filename, which you can click to change -->
-            <a class="ms-NavBar-link" href="#" id="renameFileCommand"></a>
-        </li>
+      <li class="ms-NavBar-item">
+        <!-- Current item filename, which you can click to change -->
+        <a class="ms-NavBar-link" href="#" id="renameFileCommand"></a>
+      </li>
 
       <li class="ms-NavBar-item ms-NavBar-item--right">
         <a class="ms-NavBar-link" href="https://github.com/rgregg/onedrive-texteditor-js">View Code</a>
@@ -56,23 +63,23 @@ if ((!window.location.host.startsWith("localhost")) && (window.location.protocol
   </div>
 
 
-<div class="textEditor">
+  <div class="textEditor">
     <!-- Space for the text editor to live -->
     <textarea id="canvas"></textarea>
-</div>
+  </div>
 
   <script text="text/javascript" src="js/text-edit.picker.js"></script>
   <script type="text/javascript">
-  
     $(document).ready(function () {
       markdownEditor.wireUpCommandButton($("#newFileCommand")[0], "new");
       markdownEditor.wireUpCommandButton($("#openFileCommand")[0], "open");
       markdownEditor.wireUpCommandButton($("#saveFileCommand")[0], "save");
       markdownEditor.wireUpCommandButton($("#saveAsFileCommand")[0], "saveAs");
       markdownEditor.wireUpCommandButton($("#renameFileCommand")[0], "rename");
+      markdownEditor.wireUpCommandButton($("#shareFileCommand")[0], "share");
     })
-    
   </script>
 
 </body>
+
 </html>

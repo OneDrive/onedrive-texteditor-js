@@ -139,7 +139,7 @@ var markdownEditor = {
         
         // For SAVE so we don't invoke the picker, we're going to use the REST API directly
         // using some values that we stored from the picker when we opened the item.
-        var url = parent.generateGraphUrl(parent.lastSelectedFile, (state && state.uploadIntoParentFolder) ? true : false, true);
+        var url = parent.generateGraphUrl(parent.lastSelectedFile, (state && state.uploadIntoParentFolder) ? true : false, "/content");
 
         // Create a new XMLHttpRequest() and execute it.
         var xhr = new XMLHttpRequest();
@@ -159,7 +159,7 @@ var markdownEditor = {
             }
         }
         xhr.onerror = function() {
-            window.alert("Error occured saving file.");
+            window.alert("Error occurred saving file.");
         }
 
         xhr.open("PUT", url, true);
@@ -218,31 +218,7 @@ var markdownEditor = {
         var parent = state.parent;
         
         // For PATCH we don't invoke the picker, we're going to use the REST API directly
-        var url = parent.generateGraphUrl(item, false, false);
-
-        // Create a new XMLHttpRequest() and execute it.
-        var xhr = new XMLHttpRequest();
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState == 4) {
-                // Need to update parent.lastSelectedFile with the response from this 
-                // request so future saves go to the right place
-                var uploadedItem = JSON.parse(xhr.responseText);
-                if (uploadedItem && uploadedItem.name && uploadedItem.parentReference )
-                    parent.lastSelectedFile = uploadedItem;
-                if (state.alert) {
-                    window.alert(state.alert);
-                } else {
-                    window.alert("File saved successfully.");
-                }
-            }
-        }
-        xhr.onerror = function() {
-            window.alert("Error occured patching file metadata.");
-        }
-
-        xhr.open("PATCH", url, true);
-        xhr.setRequestHeader("Content-type", "application/json");
-        xhr.setRequestHeader("Authorization", "Bearer " + parent.accessToken.accessToken)
+        var url = parent.generateGraphUrl(item, false, null);
 
         // Copy the values into patchData from the driveItem, based on names of properties in propertyList
         var patchData = { };
@@ -250,23 +226,90 @@ var markdownEditor = {
         {
             patchData[propList[i]] = item[propList[i]];
         }
-        xhr.send(JSON.stringify(patchData));
+
+        parent.sendGraphRequest("PATCH", url, parent.accessToken.accessToken, patchData, function(item) {
+            // request success
+            if (state.alert) {
+                    window.alert(state.alert);
+                } else {
+                    window.alert("File saved successfully.");
+                }
+        }, function() {
+            // request failure
+            window.alert("Error occured patching file metadata.");
+        } );
+    },
+
+    sendGraphRequest: function (method, url, accessToken, objectBody, onSuccess, onFailure) {
+        var xhr = new XMLHttpRequest();
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState == 4) {
+                var response  = JSON.parse(xhr.responseText);
+                onSuccess(response);
+            }
+        }
+        xhr.onerror = function() {
+            onFailure();
+        }
+
+        xhr.open(method, url, true);
+        xhr.setRequestHeader("Authorization", "Bearer " + accessToken)
+        if (objectBody) {
+            xhr.setRequestHeader("Content-type", "application/json");
+            xhr.send(JSON.stringify(objectBody));
+        }
+        else {
+            xhr.send();
+        }
+    },
+
+    
+    /***************** Share File ***************/
+    shareFile: function () {
+        // Make a request to Microsoft Graph to retrieve a default sharing URL for the file.
+        if (!this.lastSelectedFile || !this.lastSelectedFile.id)
+        {
+            window.alert("You need to save the file to OneDrive first, before you can share it.");
+            return;
+        }
+
+        this.ensureAccessToken(this.user, this.getSharingLink,
+            { parent: this, 
+              driveItem: this.lastSelectedFile
+            });
+    },
+
+    getSharingLink: function(token, state) {
+        var parent = state.parent;
+        var driveItem = state.driveItem;
+
+        var url = parent.generateGraphUrl(driveItem, false, "/createLink");
+        var requestBody = { type: "view" };
+
+        parent.sendGraphRequest("POST", url, parent.accessToken.accessToken, requestBody, function(perm) {
+            // Success
+            window.prompt("View-only sharing link", perm.link.webUrl);
+        }, function() {
+            // Failure
+            window.alert("Unable to create a sharing link for this file.");
+        });
     },
 
     // Used to generate the Microsoft Graph URL for a target item, with a few parameters
     // uploadIntoParentFolder: bool, indicates that we should be targeting the parent folder + filename instead of the item itself
     // targetContentStream: bool, indicates we should append /content to the item URL
-    generateGraphUrl: function(driveItem, uploadIntoParentFolder, targetContentStream) {
+    generateGraphUrl: function(driveItem, targetParentFolder, itemRelativeApiPath) {
         var url = "https://graph.microsoft.com/v1.0/";
-        if (uploadIntoParentFolder)
+        if (targetParentFolder)
         {
             url += "drives/" + driveItem.parentReference.driveId + "/items/" +driveItem.parentReference.id + "/children/" + driveItem.name;
         } else {
             url += "drives/" + driveItem.parentReference.driveId + "/items/" + driveItem.id;
         }
 
-        if (targetContentStream)
-            url += "/content";
+        if (itemRelativeApiPath) {
+            url += itemRelativeApiPath;
+        }
 
         return url;
     },
@@ -320,6 +363,9 @@ var markdownEditor = {
                 break;
             case "rename":
                 element.onclick = function () { markdownEditor.renameFile(); return false; }
+                break;
+            case "share":
+                element.onclick = function () { markdownEditor.shareFile(); return false; }
                 break;
         }
     },
