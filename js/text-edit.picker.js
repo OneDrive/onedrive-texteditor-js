@@ -3,50 +3,60 @@
 var markdownEditor = {
     applicationId: "5fc58006-b25f-4eaf-8f30-527c6fa7e5f5",
     defaultFileName: "textfile1.txt",
+    microsoftGraphApiRoot: "https://graph.microsoft.com/v1.0/",
 
     /************ Open *************/
 
     // Open a new file by invoking the picker to select a file from OneDrive.
     openFile: function () {
-        var parent = this;
+        var editor = this;
 
         // Build the options that we pass to the picker
         var options = {
             // Specify the options for the picker (we want download links and only one file).
-            clientId: parent.applicationId,
+            clientId: editor.applicationId,
             action: "download",
             multiSelect: false,
             advanced: {
+                /* Filter the files that are available for selection */
                 filter: ".md,.mdown,.txt",
+                /* Request a few additional properties */
                 queryParameters: "select=*,name,size",
+                /* Request a read-write scope for the access token */
                 scopes: ["Files.ReadWrite"]
             },
             success: function (files) {
+                // Update our state to remember how we can use the API to write back to this file.
+                editor.accessToken = files.accessToken;
+                
                 // Get the first selected file (since we're not doing multi-select) and open it
                 var selectedFile = files.value[0];
-                parent.openItemInEditor(selectedFile);
-
-                // Update our state to remember how we can use the API to write back to this file.
-                parent.accessToken = { accessToken: files.accessToken };
+                editor.openItemInEditor(selectedFile);
             },
-            error: function (e) { window.alert("Error picking a file: " + e); },
+            error: function (e) { editor.showError("Error occurred while picking a file: " + e, e); },
         };
         OneDrive.open(options);
     },
 
     // Method used to open the picked file into the editor. Resets local state and downloads the file from OneDrive.
     openItemInEditor: function (fileItem) {
-        this.lastSelectedFile = fileItem;
-
+        var editor = this;
+        editor.lastSelectedFile = fileItem;
         // Retrieve the contents of the file and load it into our editor
         var downloadLink = fileItem["@microsoft.graph.downloadUrl"];
-        var parent = this;
+        
+        // Use JQuery AJAX to download the file
         $.ajax(downloadLink, {
             success: function (data, status, xhr) {
-                parent.setEditorBody(xhr.responseText);
-                parent.setFilename(fileItem.name);
+                
+                // load the file into the editor
+                editor.setEditorBody(xhr.responseText);
+                editor.setFilename(fileItem.name);
                 $("#canvas").attr("disabled", false);
-                parent.openFileID = fileItem.id;
+                editor.openFileID = fileItem.id;
+            }, 
+            error: function(xhr, status, err) {
+                editor.showError(err);
             }
         });
     },
@@ -56,27 +66,33 @@ var markdownEditor = {
     // Save the contents of the editor back to the server using a new filename. Invokes
     // the picker to allow the user to select a folder where the file should be saved.
     saveAsFile: function () {
-        var parent = this;
+        var editor = this;
         var filename = "";
-        if (this.lastSelectedFile)
-            filename = this.lastSelectedFile.name;
-        if (!filename || filename == "")
-            filename = this.defaultFileName;
+
+        // Ensure we have a valid filename for the file
+        if (editor.lastSelectedFile) {
+            filename = editor.lastSelectedFile.name;
+        }
+        if (!filename || filename == "") {
+            filename = editor.defaultFileName;
+        }
 
         // Build the picker options to query for a folder where the file should be saved.
         var options = {
-            clientId: parent.applicationId,
+            clientId: editor.applicationId,
             action: "query",
             advanced: {
+                // Request additional parameters when we save the file
                 queryParameters: "select=id,name,parentReference"
             },
             success: function (selection) {
                 // The return here is the folder where we need to upload the item
                 var folder = selection.value[0]; 
                 
-                // Update the lastSelectedFile item with the details of the new destination folder
-                if (!parent.lastSelectedFile) {
-                    parent.lastSelectedFile = { 
+                
+                if (!editor.lastSelectedFile) {
+                    // Remember the details of the file we just created                    
+                    editor.lastSelectedFile = { 
                         id: null,
                         name: filename,
                         parentReference: {
@@ -85,20 +101,18 @@ var markdownEditor = {
                         }
                     }
                 } else {
-                    parent.lastSelectedFile.parentReference.driveId = folder.parentReference.driveId;
-                    parent.lastSelectedFile.parentReference.id = folder.id
+                    // Update the lastSelectedFile item with the details of the new destination folder
+                    editor.lastSelectedFile.parentReference.driveId = folder.parentReference.driveId;
+                    editor.lastSelectedFile.parentReference.id = folder.id
                 }
                 
                 // Store the access token from the file picker, so we don't need to get a new one
-                parent.accessToken = { accessToken: selection.accessToken };
+                editor.accessToken = { accessToken: selection.accessToken };
+
                 // Call the saveFileWithToken method, which will write this file back with Microsoft Graph
-                parent.ensureAccessToken(parent.user, parent.saveFileWithToken, 
-                { parent: parent, 
-                  alert: "File was saved to '" + folder.name + "' successfully.",
-                  uploadIntoParentFolder: true });
+                editor.saveFileWithAPI( { uploadIntoParentFolder: true });
             },
-            error: function (e) { window.alert("An error occured while saving the file: " + e);
-            }
+            error: function (e) { editor.showError("An error occurred while saving the file: " + e, e); }
         };
 
         // Launch the picker
@@ -110,69 +124,52 @@ var markdownEditor = {
     // Save the contents of the editor back to the file that was opened. If no file was
     // currently open, the saveAsFile method is invoked.
     saveFile: function () {
+        var editor = this;
         // Check to see if we know about an open file. If not, revert to the save as flow.
-        if (this.openFileID == "") {
-            this.saveAsFile();
+        if (editor.openFileID == "") {
+            editor.saveAsFile();
             return;
         }
 
         // Since we're using the API to write back changes, make sure we have a valid
         // access_token and then invoke saveFileWithToken.
-        this.ensureAccessToken(this.user, this.saveFileWithToken, {parent: this});
+        editor.saveFileWithAPI();
     },
 
     // Save the contents of the editor back to a target drive item. Requires an access token
     // and a parent reference in the state object.
-    saveFileWithToken: function (token, state) {
-        if (token == null) {
-            // An error occured and we don't have a token available to save.
-            window.alert("Unable to save file due to an authentication error. Try using Save As instead.");
+    saveFileWithAPI: function (state) {
+        var editor = this;
+        if (editor.accessToken == null) {
+            // An error occurred and we don't have a token available to save.
+            editor.showError("Unable to save file due to an authentication error. Try using Save As instead.");
             return;
         }
 
-        if (state == null) {
-            window.alert("The state parameter is required for this method.");
-            return;
-        }
-
-        var parent = state.parent;
-        
-        // For SAVE so we don't invoke the picker, we're going to use the REST API directly
+        // This method uses the REST API directly instead of the file picker,
         // using some values that we stored from the picker when we opened the item.
-        var url = parent.generateGraphUrl(parent.lastSelectedFile, (state && state.uploadIntoParentFolder) ? true : false, "/content");
+        var url = editor.generateGraphUrl(editor.lastSelectedFile, (state && state.uploadIntoParentFolder) ? true : false, "/content");
 
-        // Create a new XMLHttpRequest() and execute it.
-        var xhr = new XMLHttpRequest();
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState == 4) {
-                // Need to update parent.lastSelectedFile with the response from this 
-                // request so future saves go to the right place
-                var uploadedItem = JSON.parse(xhr.responseText);
-                if (uploadedItem && uploadedItem.name && uploadedItem.parentReference )
-                    parent.lastSelectedFile = uploadedItem;
+        var bodyContent = $("#canvas").val().replace(/\r\n|\r|\n/g, "\r\n");
 
-                if (state.alert) {
-                    window.alert(state.alert);
-                } else {
-                    window.alert("File saved successfully.");
+        // Call the REST API to PUT the text value to the contents of the file.
+        $.ajax(url, {
+            method: "PUT",
+            contentType: "application/octet-stream",
+            data: bodyContent,
+            processData: false,
+            headers: { Authorization: "Bearer" + editor.accessToken },
+            success: function(data, status, xhr) {
+                if (data && data.name && data.parentReference) {
+                    editor.lastSelectedFile = data;
+                    editor.showSuccessMessage("File was saved.");
                 }
+            },
+            error: function(xhr, status, err) {
+                editor.showError(err);
             }
-        }
-        xhr.onerror = function() {
-            window.alert("Error occurred saving file.");
-        }
-
-        xhr.open("PUT", url, true);
-        xhr.setRequestHeader("Content-type", "application/octet-stream");
-        xhr.setRequestHeader("Authorization", "Bearer " + parent.accessToken.accessToken)
-
-        // Get the body text and encode the line breaks to Windows-style.
-        var bodyContent = $("#canvas").val();
-        var bodyContentLineBreaks = bodyContent.replace(/\r\n|\r|\n/g, "\r\n");
-
-        xhr.send(bodyContentLineBreaks);
+        });
     },
-
    
 
     /************ Rename File *************/
@@ -180,20 +177,20 @@ var markdownEditor = {
     // Rename the currently open file by providing a new name for the file via an input
     // dialog
     renameFile: function () {
-        var oldFilename = (this.lastSelectedFile && this.lastSelectedFile.name) ? this.lastSelectedFile.name : this.defaultFileName;
+        var editor = this;
+
+        var oldFilename = (editor.lastSelectedFile && editor.lastSelectedFile.name) ? editor.lastSelectedFile.name : editor.defaultFileName;
         var newFilename = window.prompt("Rename file", oldFilename);
         if (!newFilename) return;
         
-        this.setFilename(newFilename);
+        editor.setFilename(newFilename);
 
-        if (this.lastSelectedFile && this.lastSelectedFile.id) {
+        if (editor.lastSelectedFile && editor.lastSelectedFile.id) {
             // Patch the file to rename it in real time.
-            this.lastSelectedFile.name = newFilename;
-            this.ensureAccessToken(this.user, this.patchDriveItemWithToken, 
-                { parent: this, 
-                  alert: "File was renamed successfully.", 
-                  driveItem: this.lastSelectedFile, 
-                  propertyList: [ "name" ]});
+            editor.lastSelectedFile.name = newFilename;
+            editor.patchDriveItemWithAPI({ propertyList: [ "name" ]} );
+        } else {
+            // The file hasn't been saved yet, so the rename is just local
         }
     },
 
@@ -201,24 +198,24 @@ var markdownEditor = {
     // parameter to have a driveItem, propertyList, and parent (reference to this object) properties.
     // driveItem is the item to update, which needs to have its id and parentReference.driveId property set to the item to patch.
     // propertyList is an array of properties on the driveItem that will be submitted as the patch. These must be top-level properties of the driveItem
-    patchDriveItemWithToken: function(token, state) {
-        if (token == null) {
-            // An error occured and we don't have a token available to save.
-            window.alert("Unable to save file due to an authentication error. Try using Save As instead.");
+    patchDriveItemWithAPI: function(state) {
+        var editor = this;
+        if (editor.accessToken == null) {
+            // An error occurred and we don't have a token available to save.
+            editor.showError("Unable to save file due to an authentication error. Try using Save As instead.");
             return;
         }
         
         if (state == null) {
-            window.alert("The state parameter is required for this method.");
+            editor.showError("The state parameter is required for this method.");
             return;
         }
 
-        var item = state.driveItem;
+        var item = editor.lastSelectedFile;
         var propList = state.propertyList;
-        var parent = state.parent;
-        
+       
         // For PATCH we don't invoke the picker, we're going to use the REST API directly
-        var url = parent.generateGraphUrl(item, false, null);
+        var url = editor.generateGraphUrl(item, false, null);
 
         // Copy the values into patchData from the driveItem, based on names of properties in propertyList
         var patchData = { };
@@ -227,71 +224,58 @@ var markdownEditor = {
             patchData[propList[i]] = item[propList[i]];
         }
 
-        parent.sendGraphRequest("PATCH", url, parent.accessToken.accessToken, patchData, function(item) {
-            // request success
-            if (state.alert) {
-                    window.alert(state.alert);
-                } else {
-                    window.alert("File saved successfully.");
+        $.ajax(url, {
+            method: "PATCH",
+            contentType: "application/json; charset=UTF-8",
+            data: JSON.stringify(patchData),
+            headers: { Authorization: "Bearer" + editor.accessToken },
+            success: function(data, status, xhr) {
+                if (data && data.name && data.parentReference) {
+                    editor.showSuccessMessage("File was updated successfully.");
+                    editor.lastSelectedFile = data;
                 }
-        }, function() {
-            // request failure
-            window.alert("Error occured patching file metadata.");
-        } );
-    },
-
-    sendGraphRequest: function (method, url, accessToken, objectBody, onSuccess, onFailure) {
-        var xhr = new XMLHttpRequest();
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState == 4) {
-                var response  = JSON.parse(xhr.responseText);
-                onSuccess(response);
+            },
+            error: function(xhr, status, err) {
+                editor.showError("Unable to patch file metadata: " + err);
             }
-        }
-        xhr.onerror = function() {
-            onFailure();
-        }
-
-        xhr.open(method, url, true);
-        xhr.setRequestHeader("Authorization", "Bearer " + accessToken)
-        if (objectBody) {
-            xhr.setRequestHeader("Content-type", "application/json");
-            xhr.send(JSON.stringify(objectBody));
-        }
-        else {
-            xhr.send();
-        }
+        });
     },
-
     
     /***************** Share File ***************/
     shareFile: function () {
+        var editor = this;
         // Make a request to Microsoft Graph to retrieve a default sharing URL for the file.
-        if (!this.lastSelectedFile || !this.lastSelectedFile.id)
+        if (!editor.lastSelectedFile || !editor.lastSelectedFile.id)
         {
-            window.alert("You need to save the file to OneDrive first, before you can share it.");
+            editor.showError("You need to save the file first before you can share it.");
             return;
         }
 
-        this.ensureAccessToken(this.user, this.getSharingLink,
-            { parent: this, 
-              driveItem: this.lastSelectedFile
-            });
+        editor.getSharingLinkWithAPI();
     },
 
-    getSharingLink: function(token, state) {
-        var parent = state.parent;
-        var driveItem = state.driveItem;
+    getSharingLinkWithAPI: function() {
+        var editor = this;
+        var driveItem = editor.lastSelectedFile;
 
-        var url = parent.generateGraphUrl(driveItem, false, "/createLink");
+        var url = editor.generateGraphUrl(driveItem, false, "/createLink");
         var requestBody = { type: "view" };
 
-        parent.sendGraphRequest("POST", url, parent.accessToken.accessToken, requestBody, function(perm) {
-            // Success
-            window.prompt("View-only sharing link", perm.link.webUrl);
-        }, function() {
-            // Failure
-            window.alert("Unable to create a sharing link for this file.");
+        $.ajax(url, {
+            method: "POST",
+            contentType: "application/json; charset=UTF-8",
+            data: JSON.stringify(patchData),
+            headers: { Authorization: "Bearer" + editor.accessToken },
+            success: function(data, status, xhr) {
+                if (data && data.link && data.link.webUrl) {
+                    window.prompt("View-only sharing link", data.link.webUrl);
+                } else {
+                    editor.showError("Unable to retrieve a sharing link for this file.");
+                }
+            },
+            error: function(xhr, status, err) {
+                editor.showError("Unable to retrieve a sharing link for this file.");
+            }
         });
     },
 
@@ -299,7 +283,7 @@ var markdownEditor = {
     // uploadIntoParentFolder: bool, indicates that we should be targeting the parent folder + filename instead of the item itself
     // targetContentStream: bool, indicates we should append /content to the item URL
     generateGraphUrl: function(driveItem, targetParentFolder, itemRelativeApiPath) {
-        var url = "https://graph.microsoft.com/v1.0/";
+        var url = this.microsoftGraphApiRoot;
         if (targetParentFolder)
         {
             url += "drives/" + driveItem.parentReference.driveId + "/items/" +driveItem.parentReference.id + "/children/" + driveItem.name;
@@ -310,7 +294,6 @@ var markdownEditor = {
         if (itemRelativeApiPath) {
             url += itemRelativeApiPath;
         }
-
         return url;
     },
 
@@ -370,77 +353,14 @@ var markdownEditor = {
         }
     },
 
-    // Uses a hidden iframe to request a new access token for Microsoft Graph, so we can make
-    // Microsoft Graph calls outside of the picker context.
-    // action is a function that takes two argument, the access token and a state value
-    ensureAccessToken: function(user, action, state) {
-        
-        if (this.accessToken) {
-            action(this.accessToken, state);
-            return;
-        }
-
-        // NOTE: The following code is not used in this example currently, but would allow
-        // JavaScript to generate new tokens as long as the user is still signed into AAD/MSA.
-
-        // var parent = this;
-        // var authorizeEndpoint = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
-        // var authorizeParameters = "?client_id=" + this.applicationId + 
-        //     "&response_type=token" + 
-        //     "&scope=Files.ReadWrite" + 
-        //     "&redirect_uri=" + encodeURIComponent(this.redirectUrl) + 
-        //     "&prompt=none" + 
-        //     "&domain_hint=" + encodeURIComponent(user.domain) + 
-        //     "&login_hint=" + encodeURIComponent(user.login);
-
-        // var iframe = $("<iframe />").attr({
-        //     width: 1,
-        //     height: 1,
-        //     src: authorizeEndpoint + authorizeParameters
-        // })
-        // $(document.body).append(iframe);
-        // iframe.on("load", function(iframeData) {
-        //     parent.parseAccessTokenFromIFrame(iframeData, action, state);
-        // });
+    // Handle displaying errors to the user
+    showError: function (msg, e) {
+        window.alert(msg);
     },
 
-    // NOTE: The following code is not used in this example currently, but would allow
-    // JavaScript to generate new tokens as long as the user is still signed into AAD/MSA.
-    // Parse the token values from the iframe result
-    // parseAccessTokenFromIFrame: function(iframeData, action, state) {
-    //     var frameHref = "";
-    //     try {
-    //         // this will throw for any issues other than succes
-    //         frameHref = iframeData.currentTarget.contentWindow.location.href;
-    //     }
-    //     catch (error) {
-    //         action(null, state);
-    //         return;
-    //     }
-
-    //     // parse the iframe query string
-    //     var accessToken = this.getQueryStringParameterByName("access_token", frameHref);
-    //     var expiresInSeconds = this.getQueryStringParameterByName("expires_in", frameHref);
-
-    //     if (accessToken != null) {
-    //         this.accessToken = { accessToken: accessToken, expiresInSeconds: expiresInSeconds };
-    //     }
-    
-    //     var iframe = $(iframeData.currentTarget);
-    //     iframe.remove();
-
-    //     action(this.accessToken, state);
-    // },
-
-    // Parse query string parmaeters and return the value of a parameter
-    // getQueryStringParameterByName: function (name, url) {
-	// 		name = name.replace(/[\[\]]/g, "\\$&");
-	// 		var regex = new RegExp("[?&#]" + name + "(=([^&#]*)|&|#|$)");
-	// 		var results = regex.exec(url);
-	// 		if (!results) return null;
-	// 		if (!results[2]) return '';
-	// 		return decodeURIComponent(results[2].replace(/\+/g, " "));
-    // },
+    showSuccessMessage: function(msg) {
+        window.alert(msg);
+    },
 
     // An object representing the currently selected file
     lastSelectedFile: null,
