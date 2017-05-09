@@ -2,7 +2,7 @@
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
 
 <head>
-  <title>OneDrive Text Editor Sample</title>
+  <title>OneDrive Markdown Editor Sample</title>
   <meta charset="utf-8" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -13,7 +13,7 @@
   <script text="text/javascript" src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-2.1.4.min.js"></script>
 
   <!-- Include the OneDrive SDK from CDN https://js.live.net/v7.2/OneDrive.js -->
-  <script type="text/javascript" src="js/OneDrive.debug.js"></script>
+  <script type="text/javascript" src="https://js.live.net/v7.2/OneDrive.js"></script>
 </head>
 
 <body>
@@ -68,7 +68,7 @@
     <textarea id="canvas"></textarea>
   </div>
 
-  <script text="text/javascript" src="js/text-edit.picker.js"></script>
+  <script text="text/javascript" src="js/markdown-editor.js"></script>
   <script type="text/javascript">
     $(document).ready(function () {
       markdownEditor.wireUpCommandButton($("#newFileCommand")[0], "new");

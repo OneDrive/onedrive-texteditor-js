@@ -2,7 +2,7 @@
 
 var markdownEditor = {
     applicationId: "5fc58006-b25f-4eaf-8f30-527c6fa7e5f5",
-    defaultFileName: "textfile1.txt",
+    defaultFileName: "MD file.md",
     microsoftGraphApiRoot: "https://graph.microsoft.com/v1.0/",
 
     /************ Open *************/
@@ -107,7 +107,7 @@ var markdownEditor = {
                 }
                 
                 // Store the access token from the file picker, so we don't need to get a new one
-                editor.accessToken = { accessToken: selection.accessToken };
+                editor.accessToken = selection.accessToken;
 
                 // Call the saveFileWithToken method, which will write this file back with Microsoft Graph
                 editor.saveFileWithAPI( { uploadIntoParentFolder: true });
@@ -264,7 +264,7 @@ var markdownEditor = {
         $.ajax(url, {
             method: "POST",
             contentType: "application/json; charset=UTF-8",
-            data: JSON.stringify(patchData),
+            data: JSON.stringify(requestBody),
             headers: { Authorization: "Bearer" + editor.accessToken },
             success: function(data, status, xhr) {
                 if (data && data.link && data.link.webUrl) {
