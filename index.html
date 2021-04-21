@@ -10,10 +10,6 @@
   <link rel="stylesheet" href="https://appsforoffice.microsoft.com/fabric/1.0/fabric.min.css">
   <link rel="stylesheet" href="https://appsforoffice.microsoft.com/fabric/1.0/fabric.components.min.css">
   <link rel="stylesheet" href="css/custom.style.css">
-  <script text="text/javascript" src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-2.1.4.min.js"></script>
-
-  <!-- Include the OneDrive SDK from CDN https://js.live.net/v7.2/OneDrive.js -->
-  <script type="text/javascript" src="https://js.live.net/v7.2/OneDrive.js"></script>
 </head>
 
 <body>
@@ -69,17 +65,21 @@
   </div>
 
   <script text="text/javascript" src="js/markdown-editor.js"></script>
-  <script type="text/javascript">
-    $(document).ready(function () {
-      markdownEditor.wireUpCommandButton($("#newFileCommand")[0], "new");
-      markdownEditor.wireUpCommandButton($("#openFileCommand")[0], "open");
-      markdownEditor.wireUpCommandButton($("#saveFileCommand")[0], "save");
-      markdownEditor.wireUpCommandButton($("#saveAsFileCommand")[0], "saveAs");
-      markdownEditor.wireUpCommandButton($("#renameFileCommand")[0], "rename");
-      markdownEditor.wireUpCommandButton($("#shareFileCommand")[0], "share");
-    })
-  </script>
+  <script text="text/javascript" src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-2.1.4.min.js"></script>
 
+    <!-- Include the OneDrive SDK from CDN https://js.live.net/v7.2/OneDrive.js -->
+    <script type="text/javascript" src="https://js.live.net/v7.2/OneDrive.js"></script>
+    <script type="text/javascript">
+      $(document).ready(function () {
+        markdownEditor.wireUpCommandButton($("#newFileCommand")[0], "new");
+        markdownEditor.wireUpCommandButton($("#openFileCommand")[0], "open");
+        markdownEditor.wireUpCommandButton($("#saveFileCommand")[0], "save");
+        markdownEditor.wireUpCommandButton($("#saveAsFileCommand")[0], "saveAs");
+        markdownEditor.wireUpCommandButton($("#renameFileCommand")[0], "rename");
+        markdownEditor.wireUpCommandButton($("#shareFileCommand")[0], "share");
+      })
+    </script>
+  
 </body>
 
 </html>
