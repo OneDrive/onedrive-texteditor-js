@@ -158,7 +158,7 @@ var markdownEditor = {
             contentType: "application/octet-stream",
             data: bodyContent,
             processData: false,
-            headers: { Authorization: "Bearer" + editor.accessToken },
+            headers: { Authorization: "Bearer " + editor.accessToken },
             success: function(data, status, xhr) {
                 if (data && data.name && data.parentReference) {
                     editor.lastSelectedFile = data;
@@ -228,7 +228,7 @@ var markdownEditor = {
             method: "PATCH",
             contentType: "application/json; charset=UTF-8",
             data: JSON.stringify(patchData),
-            headers: { Authorization: "Bearer" + editor.accessToken },
+            headers: { Authorization: "Bearer " + editor.accessToken },
             success: function(data, status, xhr) {
                 if (data && data.name && data.parentReference) {
                     editor.showSuccessMessage("File was updated successfully.");
@@ -265,7 +265,7 @@ var markdownEditor = {
             method: "POST",
             contentType: "application/json; charset=UTF-8",
             data: JSON.stringify(requestBody),
-            headers: { Authorization: "Bearer" + editor.accessToken },
+            headers: { Authorization: "Bearer " + editor.accessToken },
             success: function(data, status, xhr) {
                 if (data && data.link && data.link.webUrl) {
                     window.prompt("View-only sharing link", data.link.webUrl);
